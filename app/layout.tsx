@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -69,6 +70,7 @@ export default function RootLayout({
             </footer>
           </TooltipProvider>
         </ConvexClientProvider>
+        <Analytics />
       </body>
     </html>
   );
