@@ -224,7 +224,15 @@ export function RankingBoard() {
         </FieldGroup>
       </div>
       <CollectionNotice />
-      {status === "LoadingFirstPage" ? (
+      {(sort === "rank" || sort === "rankAsc") &&
+      stats?.rankOrderingReady === false ? (
+        <p
+          role="status"
+          className="py-12 text-center text-sm text-muted-foreground"
+        >
+          ランク順を準備しています…
+        </p>
+      ) : status === "LoadingFirstPage" ? (
         <LoadingPanel />
       ) : rows.length ? (
         <div className="min-w-0 rounded-lg border">

@@ -86,14 +86,22 @@ export const streamers = query({
       page: await Promise.all(
         result.page.map(async (row) => {
           const [profile, state] = await Promise.all([
-            ctx.db
-              .query("streamers")
-              .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
-              .unique(),
-            ctx.db
-              .query("streamerState")
-              .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
-              .unique(),
+            "displayName" in row
+              ? row
+              : ctx.db
+                  .query("streamers")
+                  .withIndex("by_twitchId", (q) =>
+                    q.eq("twitchId", row.twitchId),
+                  )
+                  .unique(),
+            "isLive" in row
+              ? row
+              : ctx.db
+                  .query("streamerState")
+                  .withIndex("by_twitchId", (q) =>
+                    q.eq("twitchId", row.twitchId),
+                  )
+                  .unique(),
           ]);
           return {
             twitchId: row.twitchId,

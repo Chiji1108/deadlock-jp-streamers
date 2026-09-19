@@ -71,7 +71,8 @@ test("global rank pagination and LIVE filtering stay correct after backfill, ref
     }
     return ids;
   });
-  await t.mutation(internal.rankOrdering.backfill, { cursor: null });
+  await t.mutation(internal.rankOrdering.backfill, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
   async function read(sort: "rank" | "rankAsc", liveOnly = false) {
     const ids: string[] = [];
     let cursor: string | null = null;
@@ -106,4 +107,84 @@ test("global rank pagination and LIVE filtering stay correct after backfill, ref
     result: null,
   });
   expect((await read("rankAsc"))[0]).toBe("1");
+});
+
+test("migration resumes across batches, verifies every period, and gates mixed legacy rows", async () => {
+  vi.useFakeTimers();
+  const t = convexTest(schema, modules);
+  const ids = await t.run(async (ctx) => {
+    const ids = [];
+    for (let i = 0; i < 60; i++) {
+      const twitchId = String(i);
+      await ctx.db.insert("steamLinks", {
+        twitchId,
+        accountId: i + 1,
+        tier: 11,
+        subrank: 6,
+        updatedAt: 1,
+        unavailable: false,
+        nextRefreshAt: 0,
+      });
+      for (const period of ["week", "month", "quarter", "all"] as const)
+        ids.push(
+          await ctx.db.insert("rankings", {
+            twitchId,
+            period,
+            asOfDay: 1,
+            isLive: i % 2 === 0,
+            durationSeconds: 1,
+            viewerSeconds: 1,
+            peakViewers: 1,
+            averageViewers: 1,
+            ...(i % 2 ? { rankScore: 11, rankReverse: 189 } : {}),
+          }),
+        );
+    }
+    return ids;
+  });
+  const args = {
+    period: "week" as const,
+    sort: "rank" as const,
+    liveOnly: false,
+    paginationOpts: { cursor: null, numItems: 100 },
+  };
+  expect((await t.query(api.dashboard.ranking, args)).page).toHaveLength(0);
+  await t.mutation(internal.rankOrdering.backfill, {});
+  expect(await t.query(internal.rankOrdering.status, {})).toMatchObject({
+    phase: "backfill",
+    repaired: 50,
+  });
+  for (let i = 0; i < 4; i++)
+    await t.mutation(internal.rankOrdering.backfill, {});
+  expect(await t.query(internal.rankOrdering.status, {})).toMatchObject({
+    phase: "verify",
+  });
+  // Corruption between repair and verification must prevent publication.
+  await t.run((ctx) => ctx.db.patch("rankings", ids[0], { rankScore: 0 }));
+  await t.mutation(internal.rankOrdering.backfill, {});
+  expect(await t.query(internal.rankOrdering.status, {})).toMatchObject({
+    phase: "backfill",
+  });
+  for (let i = 0; i < 10; i++)
+    await t.mutation(internal.rankOrdering.backfill, {});
+  expect(await t.query(internal.rankOrdering.status, {})).toMatchObject({
+    phase: "ready",
+    checked: 240,
+  });
+  for (const period of ["week", "month", "quarter", "all"] as const)
+    for (const sort of ["rank", "rankAsc"] as const)
+      for (const liveOnly of [true, false])
+        expect(
+          (
+            await t.query(api.dashboard.ranking, {
+              ...args,
+              period,
+              sort,
+              liveOnly,
+            })
+          ).page,
+        ).toHaveLength(liveOnly ? 30 : 60);
+  const before = await t.query(internal.rankOrdering.status, {});
+  await t.mutation(internal.rankOrdering.backfill, {});
+  expect(await t.query(internal.rankOrdering.status, {})).toEqual(before);
 });

@@ -170,3 +170,92 @@ test("due refresh claims at most ten links without scheduling them twice", async
     await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
   ).toHaveLength(12);
 });
+
+test.each([429, 500, 503, "network", "invalid"] as const)(
+  "transient failure %s preserves rank, records reason and backs off",
+  async (failure) => {
+    const t = await setup();
+    const id = await t.run((ctx) =>
+      ctx.db.insert("steamLinks", {
+        twitchId: "a",
+        accountId: 12345,
+        tier: 11,
+        subrank: 6,
+        updatedAt: 1,
+        unavailable: false,
+        nextRefreshAt: 0,
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (failure === "network") throw new Error("timeout");
+        if (failure === "invalid") return new Response("{}");
+        return new Response("", {
+          status: failure,
+          headers: { "Retry-After": "600" },
+        });
+      }),
+    );
+    const at = Date.now();
+    await t.action(internal.steamLinks.refresh, { id });
+    const row = await t.query(internal.steamLinks.get, { id });
+    expect(row).toMatchObject({
+      tier: 11,
+      subrank: 6,
+      updatedAt: 1,
+      unavailable: false,
+      failureCount: 1,
+      lastAttemptAt: at,
+    });
+    expect(row?.lastError).toBeTruthy();
+    expect(row!.nextRefreshAt).toBeGreaterThanOrEqual(at + 300_000);
+    if (typeof failure === "number")
+      expect(row!.nextRefreshAt).toBe(at + 600_000);
+    await t.mutation(internal.steamLinks.save, {
+      id,
+      attemptedAt: at - 1,
+      result: null,
+    });
+    expect((await t.query(internal.steamLinks.get, { id }))?.tier).toBe(11);
+    await t.mutation(internal.steamLinks.save, {
+      id,
+      attemptedAt: at + 1,
+      result: { tier: 0, subrank: 0 },
+    });
+    expect(await t.query(internal.steamLinks.get, { id })).toMatchObject({
+      tier: 0,
+      unavailable: false,
+      failureCount: 0,
+    });
+    expect(
+      (await t.query(internal.steamLinks.get, { id }))?.lastError,
+    ).toBeUndefined();
+  },
+);
+
+test("failed initial refresh is unavailable, not permanently loading", async () => {
+  const t = await setup();
+  const id = await t.run((ctx) =>
+    ctx.db.insert("steamLinks", {
+      twitchId: "a",
+      accountId: 12345,
+      tier: null,
+      subrank: null,
+      updatedAt: null,
+      unavailable: false,
+      nextRefreshAt: 0,
+    }),
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("", { status: 429 })),
+  );
+  await t.action(internal.steamLinks.refresh, { id });
+  expect(await t.query(internal.steamLinks.get, { id })).toMatchObject({
+    tier: null,
+    updatedAt: null,
+    unavailable: true,
+    lastError: "http_429",
+  });
+});

@@ -27,4 +27,10 @@ crons.interval(
   internal.steamLinks.refreshDue,
   {},
 );
+crons.interval(
+  "Complete rank ordering migration",
+  { minutes: 1 },
+  internal.rankOrdering.backfill,
+  {},
+);
 export default crons;

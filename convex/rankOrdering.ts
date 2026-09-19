@@ -1,5 +1,11 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type QueryCtx,
+  type MutationCtx,
+} from "./_generated/server";
+import { periods } from "./model";
 import { internal } from "./_generated/api";
 
 export function rankOrder(
@@ -33,24 +39,86 @@ export async function syncRankOrder(
   const rows = await ctx.db
     .query("rankings")
     .withIndex("by_twitchId_and_period", (q) => q.eq("twitchId", twitchId))
-    .take(4);
+    .take(periods.length);
   for (const row of rows)
     await ctx.db.patch("rankings", row._id, rankOrder(rank));
 }
-// Optional index fields keep old rows valid; fill existing links in bounded batches after deployment.
+// A persisted checkpoint makes each batch retryable by the cron after a failure.
+// Bump this name when changing the meaning of the materialized ordering keys.
+const MIGRATION = "rank-order-v1";
+export async function migrationState(ctx: QueryCtx) {
+  return ctx.db
+    .query("migrations")
+    .withIndex("by_name", (q) => q.eq("name", MIGRATION))
+    .unique();
+}
+export const status = internalQuery({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({ phase: v.string(), checked: v.number(), repaired: v.number() }),
+  ),
+  handler: async (ctx) => {
+    const state = await migrationState(ctx);
+    return state
+      ? { phase: state.phase, checked: state.checked, repaired: state.repaired }
+      : null;
+  },
+});
 export const backfill = internalMutation({
-  args: { cursor: v.union(v.string(), v.null()) },
+  args: {},
   returns: v.null(),
-  handler: async (ctx, { cursor }) => {
+  handler: async (ctx) => {
+    const old = await migrationState(ctx);
+    if (old?.phase === "ready") return null;
+    const phase = old?.phase ?? "backfill";
     const page = await ctx.db
-      .query("steamLinks")
-      .withIndex("by_accountId")
-      .paginate({ cursor, numItems: 50 });
-    for (const link of page.page) await syncRankOrder(ctx, link.twitchId, link);
-    if (!page.isDone)
-      await ctx.scheduler.runAfter(0, internal.rankOrdering.backfill, {
-        cursor: page.continueCursor,
-      });
+      .query("rankings")
+      .withIndex("by_creation_time")
+      .paginate({ cursor: old?.cursor ?? null, numItems: 50 });
+    let repaired = old?.repaired ?? 0;
+    let mismatch = false;
+    for (const row of page.page) {
+      const rank = await ctx.db
+        .query("steamLinks")
+        .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
+        .unique();
+      const expected = rankOrder(rank);
+      if (
+        row.rankScore !== expected.rankScore ||
+        row.rankReverse !== expected.rankReverse
+      ) {
+        mismatch = true;
+        if (phase === "backfill") {
+          await ctx.db.patch("rankings", row._id, expected);
+          repaired++;
+        }
+      }
+    }
+    // Verification failure restarts repair; never publish partially repaired data.
+    const restart = phase === "verify" && mismatch;
+    const nextPhase: "backfill" | "verify" | "ready" = restart
+      ? "backfill"
+      : page.isDone
+        ? phase === "backfill"
+          ? "verify"
+          : "ready"
+        : phase;
+    const value = {
+      name: MIGRATION,
+      phase: nextPhase,
+      cursor: restart || page.isDone ? null : page.continueCursor,
+      checked:
+        restart || (page.isDone && phase === "backfill")
+          ? 0
+          : (old?.checked ?? 0) + page.page.length,
+      repaired,
+      updatedAt: Date.now(),
+    };
+    if (old) await ctx.db.replace("migrations", old._id, value);
+    else await ctx.db.insert("migrations", value);
+    if (nextPhase !== "ready")
+      await ctx.scheduler.runAfter(0, internal.rankOrdering.backfill, {});
     return null;
   },
 });

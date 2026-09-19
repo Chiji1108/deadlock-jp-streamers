@@ -4,6 +4,18 @@ import { collectorStatus, metricFields, periodValidator } from "./model";
 
 // All timestamps and day keys are Unix milliseconds. Durations use seconds.
 export default defineSchema({
+  migrations: defineTable({
+    name: v.string(),
+    phase: v.union(
+      v.literal("backfill"),
+      v.literal("verify"),
+      v.literal("ready"),
+    ),
+    cursor: v.union(v.string(), v.null()),
+    checked: v.number(),
+    repaired: v.number(),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
   steamLinks: defineTable({
     twitchId: v.string(),
     accountId: v.number(),
@@ -12,6 +24,9 @@ export default defineSchema({
     updatedAt: v.union(v.number(), v.null()),
     unavailable: v.boolean(),
     nextRefreshAt: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    failureCount: v.optional(v.number()),
   })
     .index("by_twitchId", ["twitchId"])
     .index("by_accountId", ["accountId"])
@@ -67,7 +82,7 @@ export default defineSchema({
     isLive: v.boolean(),
     ...metricFields,
     averageViewers: v.number(),
-    streamingDays: v.number(),
+    streamingDays: v.optional(v.number()), // Legacy rows; no longer computed.
     rankScore: v.optional(v.number()),
     rankReverse: v.optional(v.number()),
   })

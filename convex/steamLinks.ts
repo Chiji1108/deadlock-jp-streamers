@@ -91,21 +91,42 @@ export const save = internalMutation({
   args: {
     id: v.id("steamLinks"),
     attemptedAt: v.number(),
+    error: v.optional(v.string()),
+    retryAfterMs: v.optional(v.number()),
     result: v.union(
       v.null(),
       v.object({ tier: v.number(), subrank: v.number() }),
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { id, attemptedAt, result }) => {
+  handler: async (ctx, { id, attemptedAt, result, error, retryAfterMs }) => {
     const row = await ctx.db.get("steamLinks", id);
-    if (!row || (row.updatedAt !== null && row.updatedAt > attemptedAt))
+    if (!row || (row.lastAttemptAt ?? row.updatedAt ?? -1) > attemptedAt)
       return null;
+    if (error) {
+      const failureCount = (row.failureCount ?? 0) + 1;
+      const backoff = Math.min(
+        HOUR,
+        5 * 60_000 * 2 ** Math.min(failureCount - 1, 4),
+      );
+      await ctx.db.patch("steamLinks", id, {
+        lastAttemptAt: attemptedAt,
+        lastError: error,
+        failureCount,
+        unavailable: row.updatedAt === null ? true : row.unavailable,
+        nextRefreshAt: attemptedAt + Math.max(backoff, retryAfterMs ?? 0),
+      });
+      return null;
+    }
     // Clear old values on protected/unavailable results rather than exposing a stale badge.
     await ctx.db.patch("steamLinks", id, {
       tier: result?.tier ?? null,
       subrank: result?.subrank ?? null,
       updatedAt: attemptedAt,
+      lastAttemptAt: attemptedAt,
+      lastError: undefined,
+      failureCount: 0,
+      nextRefreshAt: attemptedAt + HOUR,
       unavailable: result === null,
     });
     await syncRankOrder(ctx, row.twitchId, result);
@@ -120,19 +141,39 @@ export const refresh = internalAction({
     if (!row) return null;
     const attemptedAt = Date.now();
     let result = null;
+    let error: string | undefined;
+    let retryAfterMs: number | undefined;
     try {
       const response = await fetch(
         `https://api.deadlock-api.com/v1/players/${row.accountId}/rank`,
         { signal: AbortSignal.timeout(15000) },
       );
-      if (response.ok) result = parseRank(await response.json());
+      if (response.ok) {
+        try {
+          result = parseRank(await response.json());
+        } catch {
+          error = "invalid_response";
+        }
+      } else if (response.status !== 403 && response.status !== 404) {
+        error = `http_${response.status}`;
+        const header = response.headers.get("Retry-After");
+        if (header) {
+          const seconds = Number(header);
+          const delay = Number.isFinite(seconds)
+            ? seconds * 1000
+            : Date.parse(header) - attemptedAt;
+          if (Number.isFinite(delay) && delay > 0) retryAfterMs = delay;
+        }
+      }
     } catch {
-      /* Retried by the next scheduled refresh. */
+      error = "network_error";
     }
     await ctx.runMutation(internal.steamLinks.save, {
       id,
       attemptedAt,
       result,
+      ...(error ? { error } : {}),
+      ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
     });
     return null;
   },

@@ -1,3 +1,4 @@
+import { migrationState } from "./rankOrdering";
 import { rankForStreamer } from "./steamLinks";
 import { v } from "convex/values";
 import {
@@ -19,6 +20,7 @@ import { DAY, HOUR, dateLabel, dayStart, heatIndex, periodStart } from "./time";
 export const status = query({
   args: {},
   returns: v.object({
+    rankOrderingReady: v.boolean(),
     configured: v.boolean(),
     lastCollectedAt: v.union(v.number(), v.null()),
     lastAttemptAt: v.union(v.number(), v.null()),
@@ -35,6 +37,7 @@ export const status = query({
       .withIndex("by_key", (q) => q.eq("key", "twitch"))
       .unique();
     return {
+      rankOrderingReady: (await migrationState(ctx))?.phase === "ready",
       configured: value?.configured ?? false,
       lastCollectedAt: value?.lastCollectedAt ?? null,
       lastAttemptAt: value?.lastAttemptAt ?? null,
@@ -70,6 +73,11 @@ export const ranking = query({
       args.paginationOpts.numItems > 100
     )
       throw new Error("Page size must be 1–100");
+    if (
+      (args.sort === "rank" || args.sort === "rankAsc") &&
+      (await migrationState(ctx))?.phase !== "ready"
+    )
+      return { page: [], isDone: true, continueCursor: "" };
     const source = ctx.db.query("rankings");
     const ordered =
       args.sort === "rank" || args.sort === "rankAsc"

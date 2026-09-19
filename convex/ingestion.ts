@@ -10,7 +10,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { activeDays, duration, syncDaily, watched } from "./aggregates";
+import { duration, syncDaily, watched } from "./aggregates";
 import { liveObservation, periods } from "./model";
 import { DAY, MAX_GAP, dayStart, periodStart, splitHours } from "./time";
 
@@ -31,10 +31,9 @@ export async function refreshRankings(
       upper: { key: day, inclusive: true },
     },
   }));
-  const [durations, viewers, days, counts] = await Promise.all([
+  const [durations, viewers, counts] = await Promise.all([
     duration.sumBatch(ctx, ranges),
     watched.sumBatch(ctx, ranges),
-    activeDays.sumBatch(ctx, ranges),
     duration.countBatch(ctx, ranges),
   ]);
   let recent: Doc<"daily">[] | undefined;
@@ -83,7 +82,6 @@ export async function refreshRankings(
       viewerSeconds: viewers[i],
       averageViewers: durations[i] ? viewers[i] / durations[i] : 0,
       peakViewers: peak,
-      streamingDays: days[i],
       ...rankOrder(rank),
     };
     if (old) await ctx.db.replace("rankings", old._id, value);
