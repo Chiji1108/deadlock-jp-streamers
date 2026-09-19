@@ -1,4 +1,4 @@
-import { rankOrder } from "./rankOrdering";
+import { rankOrder, matchTimeOrder } from "./rankOrdering";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -83,6 +83,7 @@ export async function refreshRankings(
       averageViewers: durations[i] ? viewers[i] / durations[i] : 0,
       peakViewers: peak,
       ...rankOrder(rank),
+      ...matchTimeOrder(rank?.matchTimeSeconds),
     };
     if (old) await ctx.db.replace("rankings", old._id, value);
     else await ctx.db.insert("rankings", value);

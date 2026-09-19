@@ -587,3 +587,84 @@ test("daily refresh resumes after a lost continuation, is idempotent, and starts
     day: dayStart(initial + 2 * DAY),
   });
 });
+
+test("stream ingestion and period regeneration retain cumulative match time ordering", async () => {
+  const t = setup();
+  await observe(t, initial, live());
+  await t.run((ctx) =>
+    ctx.db.insert("steamLinks", {
+      twitchId: "1",
+      accountId: 12345,
+      tier: null,
+      subrank: null,
+      updatedAt: null,
+      unavailable: false,
+      nextRefreshAt: 0,
+      matchTimeSeconds: 5400,
+    }),
+  );
+  await observe(t, initial + 60_000, live());
+  expect(
+    await t.run(async (ctx) =>
+      (await ctx.db.query("rankings").collect()).map(
+        (row) => row.matchTimeScore,
+      ),
+    ),
+  ).toEqual([5400, 5400, 5400, 5400]);
+  await observe(t, initial + DAY, live());
+  expect(
+    await t.run(async (ctx) =>
+      (await ctx.db.query("rankings").collect()).every(
+        (row) => row.matchTimeScore === 5400,
+      ),
+    ),
+  ).toBe(true);
+});
+
+test.each(["week", "month", "quarter", "all"] as const)(
+  "%s default ordering puts live streamers first across pages, then sorts by duration",
+  async (period) => {
+    const t = setup();
+    for (const [id, seconds, isLive] of [
+      ["offline-long", 180, false],
+      ["live-short", 60, true],
+      ["offline-short", 120, false],
+      ["live-long", 120, true],
+    ] as const) {
+      await observe(t, initial, live(), id);
+      await observe(t, initial + seconds * 1000, isLive ? live() : null, id);
+    }
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 4; i++) {
+      const result: FunctionReturnType<typeof api.dashboard.ranking> =
+        await t.query(api.dashboard.ranking, {
+          period,
+          sort: "live",
+          liveOnly: false,
+          paginationOpts: { numItems: 1, cursor },
+        });
+      ids.push(...result.page.map((row) => row.twitchId));
+      cursor = result.continueCursor;
+      if (result.isDone) break;
+    }
+    expect(ids).toEqual([
+      "live-long",
+      "live-short",
+      "offline-long",
+      "offline-short",
+    ]);
+    const filtered = await t.query(api.dashboard.ranking, {
+      period,
+      sort: "live",
+      liveOnly: true,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(filtered.page.map((row) => row.twitchId)).toEqual([
+      "live-long",
+      "live-short",
+    ]);
+    const duration = await ranking(t, period);
+    expect(duration.page[0].twitchId).toBe("offline-long");
+  },
+);

@@ -6,6 +6,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --match-win: oklch(0.65 0.17 160);
+  --match-loss: oklch(0.61 0.22 25);
   --muted: oklch(0.97 0 0);
   --accent: oklch(0.97 0 0);
   --background: oklch(1 0 0);
@@ -41,6 +43,8 @@
 }
 
 @theme inline {
+  --color-match-win: var(--match-win);
+  --color-match-loss: var(--match-loss);
   --font-heading: var(--font-sans);
   --font-sans:
     var(--font-geist-sans), Arial, "Hiragino Kaku Gothic ProN", sans-serif;

@@ -1,5 +1,6 @@
 import { migrationState } from "./rankOrdering";
-import { rankForStreamer } from "./steamLinks";
+import { deadlockForStreamer } from "./steamLinks";
+import { playerActivity } from "./playerActivityModel";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -55,12 +56,14 @@ export const ranking = query({
   args: {
     period: periodValidator,
     sort: v.union(
+      v.literal("live"),
       v.literal("duration"),
       v.literal("viewers"),
       v.literal("watched"),
       v.literal("peak"),
       v.literal("rank"),
       v.literal("rankAsc"),
+      v.literal("matchTime"),
     ),
     liveOnly: v.boolean(),
     paginationOpts: paginationOptsValidator,
@@ -74,62 +77,81 @@ export const ranking = query({
     )
       throw new Error("Page size must be 1–100");
     if (
-      (args.sort === "rank" || args.sort === "rankAsc") &&
+      (args.sort === "rank" ||
+        args.sort === "rankAsc" ||
+        args.sort === "matchTime") &&
       (await migrationState(ctx))?.phase !== "ready"
     )
       return { page: [], isDone: true, continueCursor: "" };
     const source = ctx.db.query("rankings");
+    // A period-only range retains isLive as the primary descending sort key.
     const ordered =
-      args.sort === "rank" || args.sort === "rankAsc"
-        ? args.liveOnly
-          ? args.sort === "rank"
-            ? source.withIndex("by_period_and_isLive_and_rankScore", (q) =>
+      args.sort === "live"
+        ? source.withIndex("by_period_and_isLive_and_durationSeconds", (q) =>
+            args.liveOnly
+              ? q.eq("period", args.period).eq("isLive", true)
+              : q.eq("period", args.period),
+          )
+        : args.sort === "matchTime"
+          ? args.liveOnly
+            ? source.withIndex("by_period_and_isLive_and_matchTimeScore", (q) =>
                 q.eq("period", args.period).eq("isLive", true),
               )
-            : source.withIndex("by_period_and_isLive_and_rankReverse", (q) =>
-                q.eq("period", args.period).eq("isLive", true),
-              )
-          : args.sort === "rank"
-            ? source.withIndex("by_period_and_rankScore", (q) =>
+            : source.withIndex("by_period_and_matchTimeScore", (q) =>
                 q.eq("period", args.period),
               )
-            : source.withIndex("by_period_and_rankReverse", (q) =>
-                q.eq("period", args.period),
-              )
-        : args.liveOnly
-          ? args.sort === "duration"
-            ? source.withIndex(
-                "by_period_and_isLive_and_durationSeconds",
-                (q) => q.eq("period", args.period).eq("isLive", true),
-              )
-            : args.sort === "peak"
-              ? source.withIndex("by_period_and_isLive_and_peakViewers", (q) =>
-                  q.eq("period", args.period).eq("isLive", true),
-                )
-              : args.sort === "viewers"
-                ? source.withIndex(
-                    "by_period_and_isLive_and_averageViewers",
-                    (q) => q.eq("period", args.period).eq("isLive", true),
+          : args.sort === "rank" || args.sort === "rankAsc"
+            ? args.liveOnly
+              ? args.sort === "rank"
+                ? source.withIndex("by_period_and_isLive_and_rankScore", (q) =>
+                    q.eq("period", args.period).eq("isLive", true),
                   )
                 : source.withIndex(
-                    "by_period_and_isLive_and_viewerSeconds",
+                    "by_period_and_isLive_and_rankReverse",
                     (q) => q.eq("period", args.period).eq("isLive", true),
                   )
-          : args.sort === "duration"
-            ? source.withIndex("by_period_and_durationSeconds", (q) =>
-                q.eq("period", args.period),
-              )
-            : args.sort === "peak"
-              ? source.withIndex("by_period_and_peakViewers", (q) =>
-                  q.eq("period", args.period),
-                )
-              : args.sort === "viewers"
-                ? source.withIndex("by_period_and_averageViewers", (q) =>
+              : args.sort === "rank"
+                ? source.withIndex("by_period_and_rankScore", (q) =>
                     q.eq("period", args.period),
                   )
-                : source.withIndex("by_period_and_viewerSeconds", (q) =>
+                : source.withIndex("by_period_and_rankReverse", (q) =>
                     q.eq("period", args.period),
-                  );
+                  )
+            : args.liveOnly
+              ? args.sort === "duration"
+                ? source.withIndex(
+                    "by_period_and_isLive_and_durationSeconds",
+                    (q) => q.eq("period", args.period).eq("isLive", true),
+                  )
+                : args.sort === "peak"
+                  ? source.withIndex(
+                      "by_period_and_isLive_and_peakViewers",
+                      (q) => q.eq("period", args.period).eq("isLive", true),
+                    )
+                  : args.sort === "viewers"
+                    ? source.withIndex(
+                        "by_period_and_isLive_and_averageViewers",
+                        (q) => q.eq("period", args.period).eq("isLive", true),
+                      )
+                    : source.withIndex(
+                        "by_period_and_isLive_and_viewerSeconds",
+                        (q) => q.eq("period", args.period).eq("isLive", true),
+                      )
+              : args.sort === "duration"
+                ? source.withIndex("by_period_and_durationSeconds", (q) =>
+                    q.eq("period", args.period),
+                  )
+                : args.sort === "peak"
+                  ? source.withIndex("by_period_and_peakViewers", (q) =>
+                      q.eq("period", args.period),
+                    )
+                  : args.sort === "viewers"
+                    ? source.withIndex("by_period_and_averageViewers", (q) =>
+                        q.eq("period", args.period),
+                      )
+                    : source.withIndex("by_period_and_viewerSeconds", (q) =>
+                        q.eq("period", args.period),
+                      );
     const result = await ordered.order("desc").paginate(args.paginationOpts);
     const page = await Promise.all(
       result.page.map(async (row) => {
@@ -142,10 +164,10 @@ export const ranking = query({
             .query("streamerState")
             .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
             .unique(),
-          rankForStreamer(ctx, row.twitchId),
+          deadlockForStreamer(ctx, row.twitchId),
         ]);
         return {
-          deadlockRank: rank,
+          ...rank,
           twitchId: row.twitchId,
           login: profile?.login ?? row.twitchId,
           displayName: profile?.displayName ?? row.twitchId,
@@ -168,6 +190,7 @@ export const ranking = query({
 
 const detailResult = v.object({
   deadlockRank,
+  deadlockActivity: playerActivity,
   streamer: v.object({
     twitchId: v.string(),
     login: v.string(),
@@ -314,7 +337,7 @@ export const detail = query({
         ? Math.min(1, cell.durationSeconds / cell.availableSeconds)
         : 0;
     return {
-      deadlockRank: await rankForStreamer(ctx, twitchId),
+      ...(await deadlockForStreamer(ctx, twitchId)),
       streamer: {
         twitchId,
         login: profile.login,

@@ -4,7 +4,7 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, test, vi } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
-import { rankOrder } from "./rankOrdering";
+import { rankOrder, matchTimeOrder } from "./rankOrdering";
 const modules = import.meta.glob("./**/*.ts");
 afterEach(() => vi.useRealTimers());
 test("Initiate 1 through Eternus 6 order by tier then subrank, unknowns last", () => {
@@ -193,7 +193,7 @@ test("migration resumes across batches, verifies every period, and gates mixed l
     checked: 240,
   });
   for (const period of ["week", "month", "quarter", "all"] as const)
-    for (const sort of ["rank", "rankAsc"] as const)
+    for (const sort of ["rank", "rankAsc", "matchTime"] as const)
       for (const liveOnly of [true, false])
         expect(
           (
@@ -208,4 +208,146 @@ test("migration resumes across batches, verifies every period, and gates mixed l
   const before = await t.query(internal.rankOrdering.status, {});
   await t.mutation(internal.rankOrdering.backfill, {});
   expect(await t.query(internal.rankOrdering.status, {})).toEqual(before);
+});
+
+test("known zero match time sorts above missing or invalid time", () => {
+  expect(matchTimeOrder(0)).toEqual({ matchTimeScore: 0 });
+  expect(matchTimeOrder(3600)).toEqual({ matchTimeScore: 3600 });
+  for (const value of [null, undefined, -1, NaN, Infinity])
+    expect(matchTimeOrder(value)).toEqual({ matchTimeScore: -1 });
+});
+
+test("match time is globally paginated in every period, with LIVE filtering and atomic refresh/relink/unlink", async () => {
+  vi.useFakeTimers();
+  const t = convexTest(schema, modules);
+  const linkIds = await t.run(async (ctx) => {
+    const ids = [];
+    const times = [7200, 36000, 0, null];
+    for (let i = 0; i < 5; i++) {
+      const twitchId = String(i);
+      await ctx.db.insert("streamers", {
+        twitchId,
+        login: twitchId,
+        displayName: twitchId,
+        profileImageUrl: null,
+        profileUpdatedAt: null,
+        firstSeenAt: 1,
+      });
+      for (const period of ["week", "month", "quarter", "all"] as const)
+        await ctx.db.insert("rankings", {
+          twitchId,
+          period,
+          asOfDay: 1,
+          isLive: i !== 1,
+          durationSeconds: 100,
+          viewerSeconds: 100,
+          peakViewers: 1,
+          averageViewers: 1,
+        });
+      if (i < 4)
+        ids.push(
+          await ctx.db.insert("steamLinks", {
+            twitchId,
+            accountId: i + 1,
+            tier: 1,
+            subrank: 1,
+            updatedAt: null,
+            unavailable: false,
+            nextRefreshAt: 0,
+            matchTimeSeconds: times[i],
+          }),
+        );
+    }
+    return ids;
+  });
+  const args = {
+    period: "all" as const,
+    sort: "matchTime" as const,
+    liveOnly: false,
+    paginationOpts: { numItems: 1, cursor: null },
+  };
+  expect((await t.query(api.dashboard.ranking, args)).page).toHaveLength(0);
+  await t.mutation(internal.rankOrdering.backfill, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  async function read(
+    period: "week" | "month" | "quarter" | "all" = "all",
+    liveOnly = false,
+  ) {
+    const rows: FunctionReturnType<typeof api.dashboard.ranking>["page"] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const result: FunctionReturnType<typeof api.dashboard.ranking> =
+        await t.query(api.dashboard.ranking, {
+          ...args,
+          period,
+          liveOnly,
+          paginationOpts: { numItems: 1, cursor },
+        });
+      rows.push(...result.page);
+      if (result.isDone) return rows;
+      cursor = result.continueCursor;
+    }
+  }
+  for (const period of ["week", "month", "quarter", "all"] as const) {
+    const rows = await read(period);
+    expect(rows.slice(0, 3).map((r) => r.twitchId)).toEqual(["1", "0", "2"]);
+    expect(new Set(rows.slice(3).map((r) => r.twitchId))).toEqual(
+      new Set(["3", "4"]),
+    );
+    expect(
+      (await read(period, true)).slice(0, 2).map((r) => r.twitchId),
+    ).toEqual(["0", "2"]);
+  }
+  await t.mutation(internal.playerActivity.save, {
+    id: linkIds[0],
+    attemptedAt: 100,
+    history: { kind: "ok", matches: [] },
+    time: { kind: "ok", seconds: 72000 },
+  });
+  await t.mutation(internal.steamLinks.save, {
+    id: linkIds[0],
+    attemptedAt: 100,
+    result: { tier: 9, subrank: 1 },
+  });
+  for (const period of ["week", "month", "quarter", "all"] as const) {
+    const first = (await read(period))[0];
+    expect(first.twitchId).toBe("0");
+    expect(first.deadlockActivity?.matchTimeSeconds).toBe(72000);
+  }
+  await t.mutation(internal.playerActivity.save, {
+    id: linkIds[0],
+    attemptedAt: 101,
+    history: { kind: "ok", matches: [] },
+    time: { kind: "error", error: "http_429", retryAfterMs: 1000 },
+  });
+  expect((await read())[0].twitchId).toBe("0");
+  await t.mutation(internal.steamLinks.link, {
+    twitchId: "0",
+    steamAccount: "99",
+  });
+  await t.mutation(internal.playerActivity.save, {
+    id: linkIds[0],
+    attemptedAt: 102,
+    history: { kind: "ok", matches: [] },
+    time: { kind: "ok", seconds: 999999 },
+  });
+  expect((await read()).slice(0, 2).map((r) => r.twitchId)).toEqual(["1", "2"]);
+  await t.mutation(internal.playerActivity.save, {
+    id: linkIds[1],
+    attemptedAt: 103,
+    history: { kind: "ok", matches: [] },
+    time: { kind: "unavailable" },
+  });
+  expect((await read())[0].twitchId).toBe("2");
+  await t.mutation(internal.steamLinks.unlink, { twitchId: "2" });
+  expect(
+    (await read()).every((r) => r.deadlockActivity?.matchTimeSeconds == null),
+  ).toBe(true);
+  expect(
+    await t.run(async (ctx) =>
+      (await ctx.db.query("rankings").collect()).every(
+        (r) => r.matchTimeScore === -1,
+      ),
+    ),
+  ).toBe(true);
 });

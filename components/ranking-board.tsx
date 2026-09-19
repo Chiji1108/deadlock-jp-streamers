@@ -1,5 +1,6 @@
 "use client";
 import { DeadlockRank } from "./deadlock-rank";
+import { DeadlockMatchTime } from "./deadlock-activity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
@@ -40,7 +41,15 @@ import {
 export type RankingRow = FunctionReturnType<
   typeof api.dashboard.ranking
 >["page"][number];
-type Sort = "duration" | "viewers" | "watched" | "peak" | "rank" | "rankAsc";
+type Sort =
+  | "live"
+  | "duration"
+  | "viewers"
+  | "watched"
+  | "peak"
+  | "rank"
+  | "rankAsc"
+  | "matchTime";
 const sorts = [
   { key: "duration", label: "合計配信時間" },
   { key: "viewers", label: "平均視聴者" },
@@ -88,6 +97,24 @@ export function RankingTable({
                 <ArrowDown data-icon="inline-end" />
               ) : sort === "rankAsc" ? (
                 <ArrowUp data-icon="inline-end" />
+              ) : (
+                <ArrowUpDown data-icon="inline-end" />
+              )}
+            </Button>
+          </TableHead>
+          <TableHead
+            className="text-right"
+            aria-sort={sort === "matchTime" ? "descending" : "none"}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSort("matchTime")}
+              aria-label="累計試合時間の多い順に並べ替え"
+            >
+              累計試合時間
+              {sort === "matchTime" ? (
+                <ArrowDown data-icon="inline-end" />
               ) : (
                 <ArrowUpDown data-icon="inline-end" />
               )}
@@ -167,6 +194,9 @@ export function RankingTable({
               )}
             </TableCell>
             <TableCell className="text-right tabular-nums">
+              <DeadlockMatchTime activity={row.deadlockActivity} plain />
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {number(row.hoursStreamed, 1)}
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -188,13 +218,15 @@ export function RankingBoard() {
   const { period, search, update } = useFilters();
   const rawSort = search.get("sort");
   const sort: Sort =
+    rawSort === "duration" ||
     rawSort === "viewers" ||
     rawSort === "watched" ||
     rawSort === "peak" ||
     rawSort === "rank" ||
-    rawSort === "rankAsc"
+    rawSort === "rankAsc" ||
+    rawSort === "matchTime"
       ? rawSort
-      : "duration";
+      : "live";
   const liveOnly = search.get("live") === "true";
   const stats = useQuery(api.dashboard.status, {});
   const fresh = useFreshness(stats?.lastCollectedAt);
@@ -224,13 +256,15 @@ export function RankingBoard() {
         </FieldGroup>
       </div>
       <CollectionNotice />
-      {(sort === "rank" || sort === "rankAsc") &&
+      {(sort === "rank" || sort === "rankAsc" || sort === "matchTime") &&
       stats?.rankOrderingReady === false ? (
         <p
           role="status"
           className="py-12 text-center text-sm text-muted-foreground"
         >
-          ランク順を準備しています…
+          {sort === "matchTime"
+            ? "試合時間順を準備しています…"
+            : "ランク順を準備しています…"}
         </p>
       ) : status === "LoadingFirstPage" ? (
         <LoadingPanel />
@@ -279,7 +313,7 @@ export function RankingBoard() {
             disabled={status !== "CanLoadMore"}
             onClick={() => loadMore(30)}
           >
-            {status === "LoadingMore" ? "読み込み中…" : "さらに30人を見る"}
+            {status === "LoadingMore" ? "読み込み中…" : "さらに表示"}
           </Button>
         </div>
       )}

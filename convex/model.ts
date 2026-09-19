@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { playerActivity } from "./playerActivityModel";
 
 export const periodValidator = v.union(
   v.literal("week"),
@@ -47,6 +48,7 @@ export const deadlockRank = v.union(
 );
 export const rankingFields = {
   deadlockRank,
+  deadlockActivity: playerActivity,
   twitchId: v.string(),
   login: v.string(),
   displayName: v.string(),

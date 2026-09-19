@@ -1,9 +1,15 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { collectorStatus, metricFields, periodValidator } from "./model";
+import { heroAsset, recentMatch } from "./playerActivityModel";
 
 // All timestamps and day keys are Unix milliseconds. Durations use seconds.
 export default defineSchema({
+  deadlockAssets: defineTable({
+    key: v.literal("heroes"),
+    heroes: v.array(heroAsset),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
   periodRefresh: defineTable({
     key: v.literal("rankings"),
     day: v.number(),
@@ -36,9 +42,19 @@ export default defineSchema({
     lastAttemptAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
     failureCount: v.optional(v.number()),
+    // Bounded snapshot: never store more than the latest 20 matches.
+    recentMatches: v.optional(v.array(recentMatch)),
+    historyUpdatedAt: v.optional(v.number()),
+    matchTimeSeconds: v.optional(v.union(v.number(), v.null())),
+    matchTimeUpdatedAt: v.optional(v.number()),
+    nextActivityRefreshAt: v.optional(v.number()),
+    activityAttemptAt: v.optional(v.number()),
+    activityLastError: v.optional(v.string()),
+    activityFailureCount: v.optional(v.number()),
   })
     .index("by_twitchId", ["twitchId"])
     .index("by_accountId", ["accountId"])
+    .index("by_nextActivityRefreshAt", ["nextActivityRefreshAt"])
     .index("by_nextRefreshAt", ["nextRefreshAt"]),
   streamers: defineTable({
     twitchId: v.string(),
@@ -94,8 +110,15 @@ export default defineSchema({
     streamingDays: v.optional(v.number()), // Legacy rows; no longer computed.
     rankScore: v.optional(v.number()),
     rankReverse: v.optional(v.number()),
+    matchTimeScore: v.optional(v.number()),
   })
     .index("by_twitchId_and_period", ["twitchId", "period"])
+    .index("by_period_and_matchTimeScore", ["period", "matchTimeScore"])
+    .index("by_period_and_isLive_and_matchTimeScore", [
+      "period",
+      "isLive",
+      "matchTimeScore",
+    ])
     .index("by_period_and_rankScore", ["period", "rankScore"])
     .index("by_period_and_isLive_and_rankScore", [
       "period",

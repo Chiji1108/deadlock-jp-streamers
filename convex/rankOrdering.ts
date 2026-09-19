@@ -47,9 +47,34 @@ export async function syncRankOrder(
   for (const row of rows)
     await ctx.db.patch("rankings", row._id, rankOrder(rank));
 }
+export function matchTimeOrder(seconds: number | null | undefined) {
+  // Zero is a known duration; missing data must sort below it.
+  return {
+    matchTimeScore:
+      typeof seconds === "number" &&
+      Number.isSafeInteger(seconds) &&
+      seconds >= 0
+        ? seconds
+        : -1,
+  };
+}
+export async function syncMatchTimeOrder(
+  ctx: MutationCtx,
+  twitchId: string,
+  seconds: number | null | undefined,
+) {
+  const rows = await ctx.db
+    .query("rankings")
+    .withIndex("by_twitchId_and_period", (q) => q.eq("twitchId", twitchId))
+    .take(periods.length);
+  const value = matchTimeOrder(seconds);
+  for (const row of rows)
+    if (row.matchTimeScore !== value.matchTimeScore)
+      await ctx.db.patch("rankings", row._id, value);
+}
 // A persisted checkpoint makes each batch retryable by the cron after a failure.
 // Bump this name when changing the meaning of the materialized ordering keys.
-const MIGRATION = "rank-order-v2";
+const MIGRATION = "rank-and-match-time-order-v3";
 export async function migrationState(ctx: QueryCtx) {
   return ctx.db
     .query("migrations")
@@ -87,10 +112,14 @@ export const backfill = internalMutation({
         .query("steamLinks")
         .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
         .unique();
-      const expected = rankOrder(rank);
+      const expected = {
+        ...rankOrder(rank),
+        ...matchTimeOrder(rank?.matchTimeSeconds),
+      };
       if (
         row.rankScore !== expected.rankScore ||
-        row.rankReverse !== expected.rankReverse
+        row.rankReverse !== expected.rankReverse ||
+        row.matchTimeScore !== expected.matchTimeScore
       ) {
         mismatch = true;
         if (phase === "backfill") {

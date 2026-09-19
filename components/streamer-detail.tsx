@@ -1,5 +1,6 @@
 "use client";
 import { DeadlockRank } from "./deadlock-rank";
+import { DeadlockActivity } from "./deadlock-activity";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -124,6 +125,7 @@ export function StreamerDetailView({
           </a>
         </Button>
       </header>
+      <DeadlockActivity activity={data.deadlockActivity} />
       {fresh && data.live && (
         <LivePreview
           live={data.live}
@@ -177,9 +179,7 @@ export function StreamerDetailView({
           <h2 id="sessions-title" className="text-base font-semibold">
             最近の配信
           </h2>
-          <span className="text-xs text-muted-foreground">
-            最新20件
-          </span>
+          <span className="text-xs text-muted-foreground">最新20件</span>
         </div>
         {data.recentSessions.length ? (
           <div className="min-w-0 rounded-lg border">

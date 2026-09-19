@@ -91,7 +91,7 @@ export function PeriodPicker({
   const choices = availablePeriods(stats?.lastCollectedAt);
   if (choices.length === 1)
     return (
-      <span className="text-sm text-muted-foreground">
+      <span className="text-xs text-muted-foreground">
         {MEASUREMENT_START_LABEL}
       </span>
     );

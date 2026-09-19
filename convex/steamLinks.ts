@@ -1,4 +1,4 @@
-import { syncRankOrder } from "./rankOrdering";
+import { syncRankOrder, syncMatchTimeOrder } from "./rankOrdering";
 import { ConvexError, v } from "convex/values";
 import {
   internalMutation,
@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import { steamAccountId, parseRank } from "./deadlock";
 import schema from "./schema";
+import { activityForLink } from "./playerActivity";
 const HOUR = 3600000;
 
 // Dashboard-only: internal functions cannot be invoked by an unauthenticated client.
@@ -45,9 +46,12 @@ export const link = internalMutation({
       updatedAt: null,
       unavailable: false,
       nextRefreshAt: Date.now() + HOUR,
+      nextActivityRefreshAt: Date.now() + HOUR,
     });
     await syncRankOrder(ctx, twitchId, null);
+    await syncMatchTimeOrder(ctx, twitchId, null);
     await ctx.scheduler.runAfter(0, internal.steamLinks.refresh, { id });
+    await ctx.scheduler.runAfter(0, internal.playerActivity.refresh, { id });
     return null;
   },
 });
@@ -61,6 +65,7 @@ export const unlink = internalMutation({
       .unique();
     if (row) await ctx.db.delete("steamLinks", row._id);
     await syncRankOrder(ctx, twitchId, null);
+    await syncMatchTimeOrder(ctx, twitchId, null);
     return null;
   },
 });
@@ -179,11 +184,17 @@ export const refresh = internalAction({
   },
 });
 export async function rankForStreamer(ctx: QueryCtx, twitchId: string) {
+  return (await deadlockForStreamer(ctx, twitchId)).deadlockRank;
+}
+export async function deadlockForStreamer(ctx: QueryCtx, twitchId: string) {
   const row = await ctx.db
     .query("steamLinks")
     .withIndex("by_twitchId", (q) => q.eq("twitchId", twitchId))
     .unique();
-  if (!row) return null;
+  if (!row) return { deadlockRank: null, deadlockActivity: null };
   const { accountId, tier, subrank, updatedAt, unavailable } = row;
-  return { accountId, tier, subrank, updatedAt, unavailable };
+  return {
+    deadlockRank: { accountId, tier, subrank, updatedAt, unavailable },
+    deadlockActivity: activityForLink(row),
+  };
 }

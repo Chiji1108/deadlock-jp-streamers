@@ -2,6 +2,12 @@ import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
 const crons = cronJobs();
 crons.interval(
+  "Refresh linked Deadlock match activity",
+  { minutes: 1 },
+  internal.playerActivity.refreshDue,
+  {},
+);
+crons.interval(
   "Twitch Japanese Deadlock discovery",
   { minutes: 1 },
   internal.collector.collect,
