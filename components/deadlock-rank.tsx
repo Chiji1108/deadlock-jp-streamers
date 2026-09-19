@@ -81,13 +81,11 @@ export function DeadlockRank({
         </a>
       </TooltipTrigger>
       <TooltipContent>
-        <p>
-          {rank.tier === null
-            ? "Deadlock APIでランクを確認できていません。"
-            : rank.tier === 0
-              ? "ランク認定中"
-              : "直近のランクマッチをもとに表示"}
-        </p>
+        {rank.tier === null ? (
+          <p>Deadlock APIでランクを確認できていません。</p>
+        ) : rank.tier === 0 ? (
+          <p>ランク認定中</p>
+        ) : null}
         {rank.updatedAt && <p>最終確認 {dateTime(rank.updatedAt)} JST</p>}
       </TooltipContent>
     </Tooltip>
