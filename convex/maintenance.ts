@@ -1,28 +1,44 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { dayStart } from "./time";
+import { periods } from "./model";
 import { refreshRankings } from "./ingestion";
 
 // Advance dormant streamers' rolling windows even when they have not gone live.
 // Bounded continuation mutations prevent an ever-growing all-streamer transaction.
 export const refreshPeriods = internalMutation({
+  // Accept legacy scheduled calls, but trust only the persisted checkpoint.
   args: { cursor: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
+    const now = Date.now();
+    const day = dayStart(now);
+    const old = await ctx.db
+      .query("periodRefresh")
+      .withIndex("by_key", (q) => q.eq("key", "rankings"))
+      .unique();
+    if (old?.day === day && old.complete) return null;
+    const continuing = old?.day === day;
     const page = await ctx.db
       .query("streamerState")
-      .withIndex("by_twitchId")
-      .paginate({ cursor: args.cursor ?? null, numItems: 8 });
+      .withIndex("by_creation_time")
+      .paginate({ cursor: continuing ? old.cursor : null, numItems: 8 });
     for (const state of page.page)
-      await refreshRankings(
-        ctx,
-        state,
-        Math.max(Date.now(), state.lastObservedAt),
-      );
+      await refreshRankings(ctx, state, Math.max(now, state.lastObservedAt));
+    const value = {
+      key: "rankings" as const,
+      day,
+      cursor: page.isDone ? null : page.continueCursor,
+      processed: (continuing ? old.processed : 0) + page.page.length,
+      complete: page.isDone,
+      updatedAt: now,
+      completedAt: page.isDone ? now : null,
+    };
+    if (old) await ctx.db.replace("periodRefresh", old._id, value);
+    else await ctx.db.insert("periodRefresh", value);
     if (!page.isDone)
-      await ctx.scheduler.runAfter(0, internal.maintenance.refreshPeriods, {
-        cursor: page.continueCursor,
-      });
+      await ctx.scheduler.runAfter(0, internal.maintenance.refreshPeriods, {});
     return null;
   },
 });
@@ -47,7 +63,7 @@ export const expireLive = internalMutation({
         .withIndex("by_twitchId_and_period", (q) =>
           q.eq("twitchId", state.twitchId),
         )
-        .take(4);
+        .take(periods.length);
       for (const row of rankings)
         await ctx.db.patch("rankings", row._id, { isLive: false });
     }

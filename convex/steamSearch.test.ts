@@ -127,3 +127,51 @@ test("player names require admin, batch exact account ids, and ignore unrelated 
     new URL(fetchMock.mock.calls[0][0]).searchParams.get("account_ids"),
   ).toBe("12,13");
 });
+
+test("operational details require admin authorization and return recorded failures", async () => {
+  const t = convexTest(schema, modules);
+  for (const user of [
+    t,
+    t.withIdentity({ subject: "other", issuer }),
+    t.withIdentity({ subject: "admin", issuer: "wrong" }),
+  ]) {
+    await expect(user.query(api.admin.collectionHealth, {})).rejects.toThrow(
+      "管理者権限",
+    );
+    await expect(
+      user.query(api.admin.rankHealth, {
+        paginationOpts: { cursor: null, numItems: 30 },
+      }),
+    ).rejects.toThrow("管理者権限");
+  }
+  await t.run((ctx) =>
+    ctx.db.insert("steamLinks", {
+      twitchId: "player",
+      accountId: 12,
+      tier: 11,
+      subrank: 6,
+      updatedAt: 100,
+      lastAttemptAt: 200,
+      lastError: "http_429",
+      failureCount: 3,
+      nextRefreshAt: 600,
+      unavailable: false,
+    }),
+  );
+  const user = t.withIdentity({ subject: "admin", issuer });
+  expect(await user.query(api.admin.collectionHealth, {})).toBeNull();
+  expect(
+    (
+      await user.query(api.admin.rankHealth, {
+        paginationOpts: { cursor: null, numItems: 30 },
+      })
+    ).page[0],
+  ).toMatchObject({
+    displayName: "player",
+    updatedAt: 100,
+    lastAttemptAt: 200,
+    lastError: "http_429",
+    failureCount: 3,
+    nextRefreshAt: 600,
+  });
+});

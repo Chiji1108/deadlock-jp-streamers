@@ -13,6 +13,8 @@ import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
+import { AdminHealth } from "./admin-health";
+import { SteamNameCache } from "@/lib/steam-name-cache";
 import { AdminSteamSearch } from "./admin-steam-search";
 import { AdminMatchRegistration } from "./admin-match-registration";
 import { DeadlockRank } from "./deadlock-rank";
@@ -104,6 +106,7 @@ function AdminWorkspace() {
     { initialNumItems: 30 },
   );
   const getNames = useAction(api.admin.steamPlayerNames);
+  const [nameCache] = useState(() => new SteamNameCache());
   const [steamNames, setSteamNames] = useState<Record<number, string>>({});
   const accountIds = JSON.stringify(
     [
@@ -118,29 +121,23 @@ function AdminWorkspace() {
     let cancelled = false;
     const ids: number[] = JSON.parse(accountIds);
     async function loadNames() {
-      const names: Record<number, string> = {};
-      for (let i = 0; i < ids.length; i += 50) {
-        if (cancelled) return;
-        try {
-          for (const profile of await getNames({
-            accountIds: ids.slice(i, i + 50),
-          }))
-            names[profile.accountId] = profile.name;
-        } catch {
-          /* Keep the Steam ID visible if profiles are unavailable. */
-        }
-      }
+      const names = await nameCache.load(ids, (accountIds) =>
+        getNames({ accountIds }),
+      );
       if (!cancelled) setSteamNames(names);
     }
     void loadNames();
+    const timer = setInterval(() => void loadNames(), 60_000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
-  }, [accountIds, getNames]);
+  }, [accountIds, getNames, nameCache]);
   const link = useMutation(api.admin.link);
   const unlink = useMutation(api.admin.unlink);
   return (
     <>
+      <AdminHealth />
       <AdminSteamSearch />
       <AdminMatchRegistration />
       <form

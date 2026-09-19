@@ -170,3 +170,83 @@ export const steamPlayerNames = action({
     return await steamNames(accountIds);
   },
 });
+
+// Operational details are intentionally available only to administrators.
+export const collectionHealth = query({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({
+      day: v.number(),
+      processed: v.number(),
+      complete: v.boolean(),
+      updatedAt: v.number(),
+      completedAt: v.union(v.number(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const row = await ctx.db
+      .query("periodRefresh")
+      .withIndex("by_key", (q) => q.eq("key", "rankings"))
+      .unique();
+    return row
+      ? {
+          day: row.day,
+          processed: row.processed,
+          complete: row.complete,
+          updatedAt: row.updatedAt,
+          completedAt: row.completedAt,
+        }
+      : null;
+  },
+});
+export const rankHealth = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      twitchId: v.string(),
+      displayName: v.string(),
+      updatedAt: v.union(v.number(), v.null()),
+      lastAttemptAt: v.union(v.number(), v.null()),
+      lastError: v.union(v.string(), v.null()),
+      failureCount: v.number(),
+      unavailable: v.boolean(),
+      nextRefreshAt: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    if (
+      !Number.isInteger(args.paginationOpts.numItems) ||
+      args.paginationOpts.numItems < 1 ||
+      args.paginationOpts.numItems > 50
+    )
+      throw new ConvexError("ページ件数が不正です");
+    const result = await ctx.db
+      .query("steamLinks")
+      .withIndex("by_nextRefreshAt")
+      .paginate(args.paginationOpts);
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (row) => {
+          const profile = await ctx.db
+            .query("streamers")
+            .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
+            .unique();
+          return {
+            twitchId: row.twitchId,
+            displayName: profile?.displayName ?? row.twitchId,
+            updatedAt: row.updatedAt,
+            lastAttemptAt: row.lastAttemptAt ?? row.updatedAt,
+            lastError: row.lastError ?? null,
+            failureCount: row.failureCount ?? 0,
+            unavailable: row.unavailable,
+            nextRefreshAt: row.nextRefreshAt,
+          };
+        }),
+      ),
+    };
+  },
+});

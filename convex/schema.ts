@@ -4,6 +4,15 @@ import { collectorStatus, metricFields, periodValidator } from "./model";
 
 // All timestamps and day keys are Unix milliseconds. Durations use seconds.
 export default defineSchema({
+  periodRefresh: defineTable({
+    key: v.literal("rankings"),
+    day: v.number(),
+    cursor: v.union(v.string(), v.null()),
+    processed: v.number(),
+    complete: v.boolean(),
+    updatedAt: v.number(),
+    completedAt: v.union(v.number(), v.null()),
+  }).index("by_key", ["key"]),
   migrations: defineTable({
     name: v.string(),
     phase: v.union(

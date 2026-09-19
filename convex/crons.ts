@@ -33,4 +33,10 @@ crons.interval(
   internal.rankOrdering.backfill,
   {},
 );
+crons.interval(
+  "Resume unfinished ranking windows",
+  { minutes: 5 },
+  internal.maintenance.refreshPeriods,
+  {},
+);
 export default crons;

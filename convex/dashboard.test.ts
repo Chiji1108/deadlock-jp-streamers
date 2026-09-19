@@ -544,3 +544,46 @@ test("linked rank appears in both public views and disappears on unlink", async 
       ?.deadlockRank,
   ).toBeNull();
 });
+
+test("daily refresh resumes after a lost continuation, is idempotent, and starts a new JST day", async () => {
+  const t = setup();
+  for (let i = 0; i < 9; i++) await observe(t, initial, live(), String(i));
+  vi.setSystemTime(initial + DAY);
+  await t.mutation(internal.maintenance.refreshPeriods, {});
+  expect(
+    await t.run((ctx) => ctx.db.query("periodRefresh").first()),
+  ).toMatchObject({ processed: 8, complete: false });
+  // Model a stopped continuation. The watchdog must recover from stored progress.
+  await t.run(async (ctx) => {
+    for (const job of await ctx.db.system
+      .query("_scheduled_functions")
+      .collect())
+      if (job.state.kind === "pending") await ctx.scheduler.cancel(job._id);
+  });
+  await t.mutation(internal.maintenance.refreshPeriods, {});
+  const completed = await t.run((ctx) => ctx.db.query("periodRefresh").first());
+  expect(completed).toMatchObject({
+    processed: 9,
+    complete: true,
+    day: dayStart(initial + DAY),
+  });
+  const rows = await t.run((ctx) => ctx.db.query("rankings").collect());
+  expect(rows).toHaveLength(36);
+  expect(rows.every((row) => row.asOfDay === dayStart(initial + DAY))).toBe(
+    true,
+  );
+  await t.mutation(internal.maintenance.refreshPeriods, {});
+  expect(await t.run((ctx) => ctx.db.query("periodRefresh").first())).toEqual(
+    completed,
+  );
+  vi.setSystemTime(initial + 2 * DAY);
+  await t.mutation(internal.maintenance.refreshPeriods, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(
+    await t.run((ctx) => ctx.db.query("periodRefresh").first()),
+  ).toMatchObject({
+    processed: 9,
+    complete: true,
+    day: dayStart(initial + 2 * DAY),
+  });
+});
