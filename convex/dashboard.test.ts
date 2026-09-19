@@ -508,3 +508,39 @@ test("live thumbnail reaches detail and is cleared when the stream ends", async 
   );
   expect(state?.thumbnailUrl).toBeNull();
 });
+
+test("linked rank appears in both public views and disappears on unlink", async () => {
+  const t = setup();
+  await observe(t, initial, live());
+  await t.mutation(internal.steamLinks.link, {
+    twitchId: "1",
+    steamAccount: "12345",
+  });
+  const link = await t.run((ctx) => ctx.db.query("steamLinks").first());
+  await t.mutation(internal.steamLinks.save, {
+    id: link!._id,
+    attemptedAt: initial,
+    result: { tier: 9, subrank: 3 },
+  });
+  const detail = await t.query(api.dashboard.detail, {
+    twitchId: "1",
+    period: "week",
+  });
+  const list = await t.query(api.dashboard.ranking, {
+    period: "week",
+    sort: "duration",
+    liveOnly: false,
+    paginationOpts: { numItems: 30, cursor: null },
+  });
+  expect(detail?.deadlockRank).toMatchObject({
+    accountId: 12345,
+    tier: 9,
+    subrank: 3,
+  });
+  expect(list.page[0].deadlockRank).toEqual(detail?.deadlockRank);
+  await t.mutation(internal.steamLinks.unlink, { twitchId: "1" });
+  expect(
+    (await t.query(api.dashboard.detail, { twitchId: "1", period: "week" }))
+      ?.deadlockRank,
+  ).toBeNull();
+});

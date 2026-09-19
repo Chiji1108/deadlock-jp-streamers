@@ -1,0 +1,78 @@
+"use client";
+import Image from "next/image";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { dateTime } from "./dashboard-ui";
+import type { RankingRow } from "./ranking-board";
+const names = [
+  "ランク未確定",
+  "Initiate",
+  "Seeker",
+  "Acolyte",
+  "Sentinel",
+  "Mystic",
+  "Ritualist",
+  "Emissary",
+  "Oracle",
+  "Phantom",
+  "Ascendant",
+  "Eternus",
+];
+export function DeadlockRank({ rank }: { rank: RankingRow["deadlockRank"] }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!rank) return null;
+  const label =
+    rank.tier === null
+      ? rank.unavailable
+        ? "ランク取得不可"
+        : "ランク取得中"
+      : rank.tier === 0
+        ? names[0]
+        : `${names[rank.tier]} ${rank.subrank}`;
+  const src =
+    rank.tier && rank.subrank
+      ? `https://api.deadlock-api.com/v1/assets/ranks/${rank.tier}/${rank.subrank}/image?format=webp`
+      : null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <a
+          className="inline-flex w-fit rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+          href={`https://steamcommunity.com/profiles/${BigInt(rank.accountId) + BigInt("76561197960265728")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${label} — Steamプロフィール`}
+        >
+          <Badge variant="secondary">
+            {src && failedSrc !== src && (
+              <Image
+                src={src}
+                alt=""
+                width={20}
+                height={20}
+                unoptimized
+                onError={() => setFailedSrc(src)}
+              />
+            )}
+            {label}
+          </Badge>
+        </a>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>
+          {rank.tier === null
+            ? "Deadlock APIでランクを確認できていません。"
+            : rank.tier === 0
+              ? "直近のランクマッチにランク情報がありません。"
+              : "直近のランクマッチをもとに表示"}
+        </p>
+        {rank.updatedAt && <p>最終確認 {dateTime(rank.updatedAt)} JST</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}

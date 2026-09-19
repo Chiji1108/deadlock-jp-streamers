@@ -1,0 +1,413 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { SignIn, UserButton, useAuth } from "@clerk/nextjs";
+import {
+  useConvexAuth,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "convex/react";
+import { ConvexError } from "convex/values";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "@/convex/_generated/api";
+import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
+import { DeadlockRank } from "./deadlock-rank";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from "./ui/field";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "./ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "./ui/alert-dialog";
+
+type AdminRow = FunctionReturnType<typeof api.admin.streamers>["page"][number];
+function message(error: unknown) {
+  return error instanceof ConvexError && typeof error.data === "string"
+    ? error.data
+    : "保存できませんでした。時間をおいてもう一度お試しください。";
+}
+export function AdminDashboard() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const access = useQuery(api.admin.access, isAuthenticated ? {} : "skip");
+  if (!isLoaded || isLoading) return <LoadingPanel />;
+  if (!isSignedIn)
+    return (
+      <div className="flex flex-col items-center gap-6 py-6">
+        <h1 className="text-xl font-semibold">管理者ログイン</h1>
+        <SignIn routing="hash" />
+      </div>
+    );
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">配信者の管理</h1>
+        <UserButton />
+      </div>
+      {!isAuthenticated ? (
+        <Alert>
+          <AlertTitle>ログインを確認できませんでした</AlertTitle>
+          <AlertDescription>
+            再読み込みしても続く場合は、一度ログアウトしてからお試しください。
+          </AlertDescription>
+        </Alert>
+      ) : access === undefined ? (
+        <LoadingPanel />
+      ) : !access.isAdmin ? (
+        <Alert>
+          <AlertTitle>管理者権限がありません</AlertTitle>
+          <AlertDescription>
+            <p>このアカウントでは編集できません。</p>
+            <p className="break-all">ユーザーID：{access.userId}</p>
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <AdminWorkspace />
+      )}
+    </>
+  );
+}
+function AdminWorkspace() {
+  const [input, setInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [notice, setNotice] = useState("");
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.admin.streamers,
+    { search },
+    { initialNumItems: 30 },
+  );
+  const link = useMutation(api.admin.link);
+  const unlink = useMutation(api.admin.unlink);
+  return (
+    <>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSearch(input.trim());
+        }}
+      >
+        <FieldGroup>
+          <Field orientation="horizontal">
+            <FieldLabel htmlFor="streamer-search" className="sr-only">
+              配信者名で検索
+            </FieldLabel>
+            <Input
+              id="streamer-search"
+              className="max-w-sm"
+              placeholder="配信者名で検索"
+              value={input}
+              maxLength={100}
+              onChange={(event) => setInput(event.target.value)}
+            />
+            <Button type="submit" variant="outline">
+              検索
+            </Button>
+            {search && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setInput("");
+                  setSearch("");
+                }}
+              >
+                クリア
+              </Button>
+            )}
+          </Field>
+        </FieldGroup>
+      </form>
+      <p role="status" className="text-sm text-muted-foreground">
+        {notice}
+      </p>
+      {status === "LoadingFirstPage" ? (
+        <LoadingPanel />
+      ) : (
+        <AdminStreamerList
+          rows={results}
+          onSave={async (twitchId, steamAccount) => {
+            await link({ twitchId, steamAccount });
+            setNotice(
+              "Steamアカウントを保存しました。ランクを取得しています。",
+            );
+          }}
+          onUnlink={async (twitchId) => {
+            await unlink({ twitchId });
+            setNotice("紐付けを解除しました。");
+          }}
+        />
+      )}
+      {status !== "Exhausted" && status !== "LoadingFirstPage" && (
+        <Button
+          className="self-center"
+          variant="outline"
+          disabled={status !== "CanLoadMore"}
+          onClick={() => loadMore(30)}
+        >
+          {status === "LoadingMore" ? "読み込み中…" : "さらに表示"}
+        </Button>
+      )}
+    </>
+  );
+}
+export function AdminStreamerList({
+  rows,
+  onSave,
+  onUnlink,
+}: {
+  rows: AdminRow[];
+  onSave: (twitchId: string, steamAccount: string) => Promise<void>;
+  onUnlink: (twitchId: string) => Promise<void>;
+}) {
+  if (!rows.length)
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        配信者が見つかりません。
+      </p>
+    );
+  return (
+    <div className="divide-y rounded-lg border">
+      {[...rows]
+        .sort((a, b) => Number(b.isLive) - Number(a.isLive))
+        .map((row) => (
+          <div
+            key={row.twitchId}
+            className="flex flex-wrap items-center justify-between gap-4 p-4"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar name={row.displayName} url={row.profileImageUrl} />
+              <div className="flex min-w-0 flex-col gap-1">
+                <Link
+                  className="break-all font-medium hover:underline"
+                  href={`/streamers/${row.twitchId}`}
+                >
+                  {row.displayName}
+                </Link>
+                <span className="break-all text-xs text-muted-foreground">
+                  @{row.login}
+                </span>
+                <AdminLiveBadge row={row} />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {row.deadlockRank ? (
+                <DeadlockRank rank={row.deadlockRank} />
+              ) : (
+                <span className="text-xs text-muted-foreground">未登録</span>
+              )}
+              <SteamEditor
+                row={row}
+                onSave={(value) => onSave(row.twitchId, value)}
+              />
+              {row.deadlockRank && (
+                <UnlinkButton
+                  name={row.displayName}
+                  onUnlink={() => onUnlink(row.twitchId)}
+                />
+              )}
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+function AdminLiveBadge({ row }: { row: AdminRow }) {
+  const fresh = useFreshness(row.lastSeenAt);
+  return row.isLive && fresh ? (
+    <LiveBadge viewers={row.liveViewerCount} startedAt={row.liveStartedAt} />
+  ) : null;
+}
+function SteamEditor({
+  row,
+  onSave,
+}: {
+  row: AdminRow;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  function changeOpen(next: boolean) {
+    if (pending) return;
+    if (next) {
+      setValue(
+        row.deadlockRank
+          ? `https://steamcommunity.com/profiles/${BigInt(row.deadlockRank.accountId) + BigInt("76561197960265728")}`
+          : "",
+      );
+      setError("");
+    }
+    setOpen(next);
+  }
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={`${row.displayName}のSteamを${row.deadlockRank ? "変更" : "登録"}`}
+        >
+          {row.deadlockRank ? "変更" : "Steamを登録"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent showCloseButton={!pending}>
+        <DialogHeader>
+          <DialogTitle>
+            Steamアカウントの{row.deadlockRank ? "変更" : "登録"}
+          </DialogTitle>
+          <DialogDescription>
+            {row.displayName}（@{row.login}）
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          id={`steam-${row.twitchId}`}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (pending) return;
+            setPending(true);
+            setError("");
+            try {
+              await onSave(value.trim());
+              setOpen(false);
+            } catch (error) {
+              setError(message(error));
+            } finally {
+              setPending(false);
+            }
+          }}
+        >
+          <FieldGroup>
+            <Field data-invalid={!!error}>
+              <FieldLabel htmlFor={`steam-input-${row.twitchId}`}>
+                SteamプロフィールURL / ID
+              </FieldLabel>
+              <Input
+                id={`steam-input-${row.twitchId}`}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                placeholder="https://steamcommunity.com/profiles/…"
+                required
+                maxLength={300}
+                disabled={pending}
+                aria-invalid={!!error}
+                aria-describedby={`steam-help-${row.twitchId}`}
+              />
+              <FieldDescription id={`steam-help-${row.twitchId}`}>
+                数値ID付きURL、SteamID64、SteamID3に対応しています。本人のアカウントを確認して登録してください。
+              </FieldDescription>
+              {error && <FieldError>{error}</FieldError>}
+            </Field>
+          </FieldGroup>
+        </form>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => setOpen(false)}
+          >
+            キャンセル
+          </Button>
+          <Button
+            form={`steam-${row.twitchId}`}
+            type="submit"
+            disabled={pending || !value.trim()}
+          >
+            {pending ? "保存中…" : "保存"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function UnlinkButton({
+  name,
+  onUnlink,
+}: {
+  name: string;
+  onUnlink: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) {
+          setOpen(next);
+          setError("");
+        }
+      }}
+    >
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`${name}のSteam紐付けを解除`}
+        >
+          解除
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Steamの紐付けを解除しますか？</AlertDialogTitle>
+          <AlertDialogDescription>
+            {name}のランク表示が消えます。配信の記録は残ります。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>キャンセル</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={pending}
+            onClick={async (event) => {
+              event.preventDefault();
+              if (pending) return;
+              setPending(true);
+              try {
+                await onUnlink();
+                setOpen(false);
+              } catch (error) {
+                setError(message(error));
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            {pending ? "解除中…" : "解除する"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

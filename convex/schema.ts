@@ -4,6 +4,18 @@ import { collectorStatus, metricFields, periodValidator } from "./model";
 
 // All timestamps and day keys are Unix milliseconds. Durations use seconds.
 export default defineSchema({
+  steamLinks: defineTable({
+    twitchId: v.string(),
+    accountId: v.number(),
+    tier: v.union(v.number(), v.null()),
+    subrank: v.union(v.number(), v.null()),
+    updatedAt: v.union(v.number(), v.null()),
+    unavailable: v.boolean(),
+    nextRefreshAt: v.number(),
+  })
+    .index("by_twitchId", ["twitchId"])
+    .index("by_accountId", ["accountId"])
+    .index("by_nextRefreshAt", ["nextRefreshAt"]),
   streamers: defineTable({
     twitchId: v.string(),
     login: v.string(),
@@ -11,7 +23,9 @@ export default defineSchema({
     profileImageUrl: v.union(v.string(), v.null()),
     profileUpdatedAt: v.union(v.number(), v.null()),
     firstSeenAt: v.number(),
-  }).index("by_twitchId", ["twitchId"]),
+  })
+    .index("by_twitchId", ["twitchId"])
+    .searchIndex("search_displayName", { searchField: "displayName" }),
   streamerState: defineTable({
     twitchId: v.string(),
     isLive: v.boolean(),

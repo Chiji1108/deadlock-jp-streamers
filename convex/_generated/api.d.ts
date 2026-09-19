@@ -8,14 +8,17 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as aggregates from "../aggregates.js";
 import type * as collectionState from "../collectionState.js";
 import type * as collector from "../collector.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as deadlock from "../deadlock.js";
 import type * as ingestion from "../ingestion.js";
 import type * as maintenance from "../maintenance.js";
 import type * as model from "../model.js";
+import type * as steamLinks from "../steamLinks.js";
 import type * as time from "../time.js";
 import type * as twitch from "../twitch.js";
 
@@ -26,14 +29,17 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   aggregates: typeof aggregates;
   collectionState: typeof collectionState;
   collector: typeof collector;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  deadlock: typeof deadlock;
   ingestion: typeof ingestion;
   maintenance: typeof maintenance;
   model: typeof model;
+  steamLinks: typeof steamLinks;
   time: typeof time;
   twitch: typeof twitch;
 }>;

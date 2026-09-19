@@ -1,3 +1,4 @@
+import { rankForStreamer } from "./steamLinks";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -7,6 +8,7 @@ import { query } from "./_generated/server";
 import { activeDays, duration, watched } from "./aggregates";
 import {
   collectorStatus,
+  deadlockRank,
   displayMetricFields,
   metrics,
   periodValidator,
@@ -101,7 +103,7 @@ export const ranking = query({
     const result = await ordered.order("desc").paginate(args.paginationOpts);
     const page = await Promise.all(
       result.page.map(async (row) => {
-        const [profile, state] = await Promise.all([
+        const [profile, state, rank] = await Promise.all([
           ctx.db
             .query("streamers")
             .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
@@ -110,8 +112,10 @@ export const ranking = query({
             .query("streamerState")
             .withIndex("by_twitchId", (q) => q.eq("twitchId", row.twitchId))
             .unique(),
+          rankForStreamer(ctx, row.twitchId),
         ]);
         return {
+          deadlockRank: rank,
           twitchId: row.twitchId,
           login: profile?.login ?? row.twitchId,
           displayName: profile?.displayName ?? row.twitchId,
@@ -133,6 +137,7 @@ export const ranking = query({
 });
 
 const detailResult = v.object({
+  deadlockRank,
   streamer: v.object({
     twitchId: v.string(),
     login: v.string(),
@@ -279,6 +284,7 @@ export const detail = query({
         ? Math.min(1, cell.durationSeconds / cell.availableSeconds)
         : 0;
     return {
+      deadlockRank: await rankForStreamer(ctx, twitchId),
       streamer: {
         twitchId,
         login: profile.login,

@@ -1,4 +1,5 @@
 "use client";
+import { DeadlockRank } from "./deadlock-rank";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -110,6 +111,7 @@ export function StreamerDetailView({
               @{streamer.login}
             </span>
           </div>
+          <DeadlockRank rank={data.deadlockRank} />
         </div>
         <Button asChild variant="outline" size="sm">
           <a

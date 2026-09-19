@@ -35,7 +35,18 @@ export function metrics<
     hoursWatched: value.viewerSeconds / 3600,
   };
 }
+export const deadlockRank = v.union(
+  v.null(),
+  v.object({
+    accountId: v.number(),
+    tier: v.union(v.number(), v.null()),
+    subrank: v.union(v.number(), v.null()),
+    updatedAt: v.union(v.number(), v.null()),
+    unavailable: v.boolean(),
+  }),
+);
 export const rankingFields = {
+  deadlockRank,
   twitchId: v.string(),
   login: v.string(),
   displayName: v.string(),

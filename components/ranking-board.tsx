@@ -1,4 +1,5 @@
 "use client";
+import { DeadlockRank } from "./deadlock-rank";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUpDown } from "lucide-react";
@@ -117,6 +118,7 @@ export function RankingTable({
                   >
                     {row.displayName}
                   </Link>
+                  <DeadlockRank rank={row.deadlockRank} />
                   {fresh && row.isLive && (
                     <LiveBadge
                       viewers={row.liveViewerCount}

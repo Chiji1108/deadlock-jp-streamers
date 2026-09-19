@@ -21,4 +21,10 @@ crons.cron(
   internal.maintenance.refreshPeriods,
   {},
 );
+crons.interval(
+  "Refresh linked Deadlock ranks",
+  { minutes: 1 },
+  internal.steamLinks.refreshDue,
+  {},
+);
 export default crons;
