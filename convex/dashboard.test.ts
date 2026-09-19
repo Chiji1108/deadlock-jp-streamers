@@ -622,17 +622,17 @@ test("stream ingestion and period regeneration retain cumulative match time orde
 });
 
 test.each(["week", "month", "quarter", "all"] as const)(
-  "%s default ordering puts live streamers first across pages, then sorts by duration",
+  "%s default ordering puts live streamers first across pages, then sorts by hours watched",
   async (period) => {
     const t = setup();
-    for (const [id, seconds, isLive] of [
-      ["offline-long", 180, false],
-      ["live-short", 60, true],
-      ["offline-short", 120, false],
-      ["live-long", 120, true],
+    for (const [id, seconds, isLive, viewers] of [
+      ["offline-long", 180, false, 10],
+      ["live-short", 60, true, 30],
+      ["offline-short", 120, false, 40],
+      ["live-long", 120, true, 10],
     ] as const) {
-      await observe(t, initial, live(), id);
-      await observe(t, initial + seconds * 1000, isLive ? live() : null, id);
+      await observe(t, initial, live(viewers), id);
+      await observe(t, initial + seconds * 1000, isLive ? live(viewers) : null, id);
     }
     const ids: string[] = [];
     let cursor: string | null = null;
@@ -649,10 +649,10 @@ test.each(["week", "month", "quarter", "all"] as const)(
       if (result.isDone) break;
     }
     expect(ids).toEqual([
-      "live-long",
       "live-short",
-      "offline-long",
+      "live-long",
       "offline-short",
+      "offline-long",
     ]);
     const filtered = await t.query(api.dashboard.ranking, {
       period,
@@ -661,8 +661,8 @@ test.each(["week", "month", "quarter", "all"] as const)(
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(filtered.page.map((row) => row.twitchId)).toEqual([
-      "live-long",
       "live-short",
+      "live-long",
     ]);
     const duration = await ranking(t, period);
     expect(duration.page[0].twitchId).toBe("offline-long");

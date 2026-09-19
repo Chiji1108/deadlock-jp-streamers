@@ -87,7 +87,7 @@ export const ranking = query({
     // A period-only range retains isLive as the primary descending sort key.
     const ordered =
       args.sort === "live"
-        ? source.withIndex("by_period_and_isLive_and_durationSeconds", (q) =>
+        ? source.withIndex("by_period_and_isLive_and_viewerSeconds", (q) =>
             args.liveOnly
               ? q.eq("period", args.period).eq("isLive", true)
               : q.eq("period", args.period),
