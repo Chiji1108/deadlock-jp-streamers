@@ -49,9 +49,20 @@ export default function RootLayout({
             </main>
             <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
               <Separator />
-              <p className="mt-4 text-xs text-muted-foreground">
-                非公式ファンプロジェクト · 時刻と日付は日本時間（JST）
-              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <p>非公式ファンプロジェクト · 時刻と日付は日本時間（JST）</p>
+                <p>
+                  ©{" "}
+                  <a
+                    href="https://www.twitch.tv/miri_ch_"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    ミリちゃんねる
+                  </a>
+                </p>
+              </div>
             </footer>
           </TooltipProvider>
         </ConvexClientProvider>
