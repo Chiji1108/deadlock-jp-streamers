@@ -16,9 +16,14 @@ test("Initiate 1 through Eternus 6 order by tier then subrank, unknowns last", (
     rankScore: 116,
     rankReverse: 84,
   });
+  expect(rankOrder({ tier: 0, subrank: 0 })).toEqual({
+    rankScore: 1,
+    rankReverse: 1,
+  });
   for (const rank of [
     null,
-    { tier: 0, subrank: 0 },
+    { tier: 0, subrank: 0, unavailable: true },
+    { tier: 0, subrank: 1 },
     { tier: null, subrank: null },
     { tier: 11, subrank: 6, unavailable: true },
   ])
@@ -71,8 +76,24 @@ test("global rank pagination and LIVE filtering stay correct after backfill, ref
     }
     return ids;
   });
+  await t.run((ctx) =>
+    ctx.db.insert("migrations", {
+      name: "rank-order-v1",
+      phase: "ready",
+      cursor: null,
+      checked: 5,
+      repaired: 0,
+      updatedAt: 1,
+    }),
+  );
+  expect((await t.query(api.dashboard.status, {})).rankOrderingReady).toBe(
+    false,
+  );
   await t.mutation(internal.rankOrdering.backfill, {});
   await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect((await t.query(api.dashboard.status, {})).rankOrderingReady).toBe(
+    true,
+  );
   async function read(sort: "rank" | "rankAsc", liveOnly = false) {
     const ids: string[] = [];
     let cursor: string | null = null;
@@ -89,10 +110,10 @@ test("global rank pagination and LIVE filtering stay correct after backfill, ref
       cursor = result.continueCursor;
     }
   }
-  expect((await read("rank")).slice(0, 3)).toEqual(["1", "2", "0"]);
-  expect((await read("rankAsc")).slice(0, 3)).toEqual(["0", "2", "1"]);
-  expect((await read("rank", true)).slice(0, 2)).toEqual(["2", "0"]);
-  expect((await read("rankAsc", true)).slice(0, 2)).toEqual(["0", "2"]);
+  expect(await read("rank")).toEqual(["1", "2", "0", "3", "4"]);
+  expect(await read("rankAsc")).toEqual(["0", "2", "1", "3", "4"]);
+  expect(await read("rank", true)).toEqual(["2", "0", "3", "4"]);
+  expect(await read("rankAsc", true)).toEqual(["0", "2", "3", "4"]);
   await t.mutation(internal.steamLinks.save, {
     id: linkIds[0],
     attemptedAt: 10,

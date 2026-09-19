@@ -27,6 +27,10 @@ export function rankOrder(
     Number.isInteger(subrank) &&
     subrank >= 1 &&
     subrank <= 6;
+  // Obscurus has a known account/rank response, unlike an unlinked or unavailable rank.
+  // Keep it below rated players but above missing ranks in both directions.
+  if (!rank?.unavailable && tier === 0 && subrank === 0)
+    return { rankScore: 1, rankReverse: 1 };
   const score = valid ? tier * 10 + subrank : 0;
   // Both indexes are read descending, so unknown/missing ranks stay last in either direction.
   return { rankScore: score, rankReverse: score ? 200 - score : 0 };
@@ -45,7 +49,7 @@ export async function syncRankOrder(
 }
 // A persisted checkpoint makes each batch retryable by the cron after a failure.
 // Bump this name when changing the meaning of the materialized ordering keys.
-const MIGRATION = "rank-order-v1";
+const MIGRATION = "rank-order-v2";
 export async function migrationState(ctx: QueryCtx) {
   return ctx.db
     .query("migrations")
