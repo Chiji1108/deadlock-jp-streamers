@@ -142,7 +142,7 @@ export function StreamerDetailView({
           <Metric
             label="合計配信時間"
             value={number(summary.hoursStreamed, 1)}
-            unit="h"
+            unit="時間"
           />
           <Metric
             label="平均視聴者"
@@ -161,11 +161,10 @@ export function StreamerDetailView({
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          期間内の配信日数 {number(summary.streamingDays)}日 · 最初の観測{" "}
-          {dateTime(streamer.firstSeenAt)} JST
+          配信日数 {number(summary.streamingDays)}日
         </p>
       </section>
-      <div className="w-full min-w-0 max-w-xl">
+      <div className="w-full min-w-0">
         <StreamingHoursHeatmap cells={data.heatmap} />
       </div>
       <section
@@ -187,7 +186,7 @@ export function StreamerDetailView({
                 <TableRow>
                   <TableHead>観測開始</TableHead>
                   <TableHead>タイトル</TableHead>
-                  <TableHead className="text-right">配信時間 (h)</TableHead>
+                  <TableHead className="text-right">配信時間 (時間)</TableHead>
                   <TableHead className="text-right">平均視聴者</TableHead>
                   <TableHead className="text-right">ピーク</TableHead>
                 </TableRow>
@@ -239,9 +238,6 @@ export function StreamerDetailView({
           最終観測 {data.lastCollectedAt ? dateTime(data.lastCollectedAt) : "—"}{" "}
           JST
         </span>
-        <Link className="underline underline-offset-4" href="/about">
-          集計のしくみ
-        </Link>
       </div>
     </div>
   );

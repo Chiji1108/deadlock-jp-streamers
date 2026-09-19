@@ -42,7 +42,7 @@ export type RankingRow = FunctionReturnType<
 >["page"][number];
 type Sort = "duration" | "viewers" | "watched" | "peak";
 const sorts = [
-  { key: "duration", label: "合計配信時間 (h)" },
+  { key: "duration", label: "合計配信時間 (時間)" },
   { key: "viewers", label: "平均視聴者" },
   { key: "watched", label: "総視聴時間 (人時)" },
   { key: "peak", label: "ピーク視聴者" },

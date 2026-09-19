@@ -12,7 +12,15 @@ export default function About() {
 
       <h1 className="text-xl font-semibold">データについて</h1>
       <p>
-        日本語でDeadlockを配信する人たちを、観測データから見つけるためのボードです。
+        <a
+          href="https://www.twitch.tv/miri_ch_"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          ミリちゃんねる
+        </a>
+        がDeadlock日本配信をあまりにも好きすぎるため、2026/9/19から独自にデータを収集し、それとなーくいい感じにまとめたものがこのサイトとなっております。
       </p>
       <section>
         <h2>データの収集開始日</h2>
@@ -23,7 +31,7 @@ export default function About() {
       <section>
         <h2>何を計測している？</h2>
         <p>
-          Twitchで配信言語を日本語に設定し、Deadlockカテゴリで配信しているチャンネルが対象です。国籍による判定ではありません。約1分ごとに取得した情報をもとに、画面を自動更新します。
+          Twitchで配信言語を日本語に設定し、Deadlockカテゴリで配信しているチャンネルが対象です。国籍による判定ではありません。
         </p>
       </section>
       <section>
