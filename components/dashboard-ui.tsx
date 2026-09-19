@@ -225,3 +225,15 @@ export function CollectionNotice() {
     </Alert>
   ) : null;
 }
+
+export function LastObserved() {
+  const status = useQuery(api.dashboard.status, {});
+  return (
+    <span>
+      最終観測{" "}
+      {status?.lastCollectedAt
+        ? `${dateTime(status.lastCollectedAt)} JST`
+        : "—"}
+    </span>
+  );
+}

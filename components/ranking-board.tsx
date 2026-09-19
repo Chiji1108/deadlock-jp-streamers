@@ -11,7 +11,6 @@ import {
   LiveBadge,
   LoadingPanel,
   PeriodPicker,
-  dateTime,
   number,
   useFilters,
   useFreshness,
@@ -42,10 +41,10 @@ export type RankingRow = FunctionReturnType<
 >["page"][number];
 type Sort = "duration" | "viewers" | "watched" | "peak";
 const sorts = [
-  { key: "duration", label: "合計配信時間 (時間)" },
+  { key: "duration", label: "合計配信時間" },
   { key: "viewers", label: "平均視聴者" },
-  { key: "watched", label: "総視聴時間 (人時)" },
   { key: "peak", label: "ピーク視聴者" },
+  { key: "watched", label: "総視聴時間" },
 ] as const;
 
 export function RankingTable({
@@ -111,22 +110,18 @@ export function RankingTable({
             <TableCell>
               <div className="flex min-w-40 items-center gap-3 py-1">
                 <Avatar name={row.displayName} url={row.profileImageUrl} />
-                <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex min-w-0 max-w-60 flex-col gap-1 sm:max-w-96">
                   <Link
                     className="max-w-52 truncate font-medium hover:underline"
                     href={`/streamers/${row.twitchId}?period=${period}`}
                   >
                     {row.displayName}
                   </Link>
-                  {fresh && row.isLive ? (
+                  {fresh && row.isLive && (
                     <LiveBadge
                       viewers={row.liveViewerCount}
                       startedAt={row.liveStartedAt}
                     />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      @{row.login}
-                    </span>
                   )}
                 </div>
               </div>
@@ -138,10 +133,10 @@ export function RankingTable({
               {number(row.averageViewers, 1)}
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {number(row.hoursWatched, 1)}
+              {number(row.peakViewers)}
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {number(row.peakViewers)}
+              {number(row.hoursWatched, 1)}
             </TableCell>
           </TableRow>
         ))}
@@ -236,14 +231,6 @@ export function RankingBoard() {
           </Button>
         </div>
       )}
-      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          最終観測{" "}
-          {stats?.lastCollectedAt
-            ? `${dateTime(stats.lastCollectedAt)} JST`
-            : "—"}
-        </span>
-      </div>
     </>
   );
 }

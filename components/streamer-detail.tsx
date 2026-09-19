@@ -102,15 +102,13 @@ export function StreamerDetailView({
             name={streamer.displayName}
             url={streamer.profileImageUrl}
           />
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="break-all text-xl font-semibold">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="break-all text-xl leading-6 font-semibold">
               {streamer.displayName}
             </h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                @{streamer.login}
-              </span>
-            </div>
+            <span className="break-all text-sm leading-4 text-muted-foreground">
+              @{streamer.login}
+            </span>
           </div>
         </div>
         <Button asChild variant="outline" size="sm">
@@ -133,9 +131,14 @@ export function StreamerDetailView({
       )}
       <section className="flex flex-col gap-4" aria-labelledby="summary-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="summary-title" className="text-base font-semibold">
-            {period === "all" ? "累計" : periodLabels[period]}の集計
-          </h2>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 id="summary-title" className="text-base font-semibold">
+              {period === "all" ? "累計" : periodLabels[period]}の集計
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              配信日数 {number(summary.streamingDays)}日
+            </span>
+          </div>
           <PeriodPicker period={period} onChange={onPeriodChange} />
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -160,9 +163,6 @@ export function StreamerDetailView({
             unit="人時"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          配信日数 {number(summary.streamingDays)}日
-        </p>
       </section>
       <div className="w-full min-w-0">
         <StreamingHoursHeatmap cells={data.heatmap} />
@@ -186,9 +186,9 @@ export function StreamerDetailView({
                 <TableRow>
                   <TableHead>観測開始</TableHead>
                   <TableHead>タイトル</TableHead>
-                  <TableHead className="text-right">配信時間 (時間)</TableHead>
+                  <TableHead className="text-right">配信時間</TableHead>
                   <TableHead className="text-right">平均視聴者</TableHead>
-                  <TableHead className="text-right">ピーク</TableHead>
+                  <TableHead className="text-right">ピーク視聴者</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -233,12 +233,6 @@ export function StreamerDetailView({
           </Empty>
         )}
       </section>
-      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          最終観測 {data.lastCollectedAt ? dateTime(data.lastCollectedAt) : "—"}{" "}
-          JST
-        </span>
-      </div>
     </div>
   );
 }

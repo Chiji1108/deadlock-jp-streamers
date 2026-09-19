@@ -5,6 +5,7 @@ import "./globals.css";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { LastObserved } from "@/components/dashboard-ui";
 import { Separator } from "@/components/ui/separator";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
@@ -50,7 +51,9 @@ export default function RootLayout({
             <footer className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
               <Separator />
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <p>非公式ファンプロジェクト · 時刻と日付は日本時間（JST）</p>
+                <p>
+                  <LastObserved />
+                </p>
                 <p>
                   ©{" "}
                   <a
