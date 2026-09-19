@@ -19,12 +19,12 @@ import {
 type Match = FunctionReturnType<typeof api.admin.matchParticipants>;
 type Player = Match["players"][number];
 type Streamer = FunctionReturnType<typeof api.admin.streamers>["page"][number];
-function errorMessage(error: unknown) {
+export function errorMessage(error: unknown) {
   return error instanceof ConvexError && typeof error.data === "string"
     ? error.data
     : "処理できませんでした。時間をおいてもう一度お試しください。";
 }
-function profileUrl(accountId: number) {
+export function profileUrl(accountId: number) {
   return `https://steamcommunity.com/profiles/${BigInt(accountId) + BigInt("76561197960265728")}`;
 }
 export function AdminMatchRegistration() {
@@ -154,12 +154,12 @@ export function AdminMatchRegistration() {
     </section>
   );
 }
-function StreamerPicker({
+export function StreamerPicker({
   player,
   onClose,
   onSaved,
 }: {
-  player: Player;
+  player: { accountId: number; name: string; heroName?: string };
   onClose: () => void;
   onSaved: (name: string) => void;
 }) {
@@ -191,7 +191,8 @@ function StreamerPicker({
         <DialogHeader>
           <DialogTitle>紐付ける配信者を選択</DialogTitle>
           <DialogDescription>
-            {player.name} · {player.heroName}
+            {player.name}
+            {player.heroName ? ` · ${player.heroName}` : ""}
           </DialogDescription>
         </DialogHeader>
         <a

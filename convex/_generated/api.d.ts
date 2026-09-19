@@ -20,6 +20,7 @@ import type * as maintenance from "../maintenance.js";
 import type * as matchLookup from "../matchLookup.js";
 import type * as model from "../model.js";
 import type * as steamLinks from "../steamLinks.js";
+import type * as steamSearch from "../steamSearch.js";
 import type * as time from "../time.js";
 import type * as twitch from "../twitch.js";
 
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   matchLookup: typeof matchLookup;
   model: typeof model;
   steamLinks: typeof steamLinks;
+  steamSearch: typeof steamSearch;
   time: typeof time;
   twitch: typeof twitch;
 }>;

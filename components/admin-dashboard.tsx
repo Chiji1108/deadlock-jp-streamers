@@ -12,6 +12,7 @@ import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
+import { AdminSteamSearch } from "./admin-steam-search";
 import { AdminMatchRegistration } from "./admin-match-registration";
 import { DeadlockRank } from "./deadlock-rank";
 import { Button } from "./ui/button";
@@ -105,6 +106,7 @@ function AdminWorkspace() {
   const unlink = useMutation(api.admin.unlink);
   return (
     <>
+      <AdminSteamSearch />
       <AdminMatchRegistration />
       <form
         onSubmit={(event) => {
