@@ -35,7 +35,7 @@ export function StreamingHoursHeatmap({
           配信している時間帯
         </h2>
         <span className="text-xs text-muted-foreground">
-          直近90日間の観測割合
+          直近90日間
         </span>
       </div>
       <Card className="min-w-0">

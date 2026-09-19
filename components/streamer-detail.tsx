@@ -108,24 +108,20 @@ export function StreamerDetailView({
             <h1 className="break-all text-xl leading-6 font-semibold">
               {streamer.displayName}
             </h1>
-            <span className="break-all text-sm leading-4 text-muted-foreground">
-              @{streamer.login}
-            </span>
+            <a
+              className="inline-flex w-fit items-center gap-1 text-sm leading-4 text-muted-foreground hover:text-foreground hover:underline"
+              href={`https://www.twitch.tv/${encodeURIComponent(streamer.login)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`@${streamer.login}のTwitchを開く（新しいタブ）`}
+            >
+              <span className="break-all">@{streamer.login}</span>
+              <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+            </a>
           </div>
           <DeadlockRank rank={data.deadlockRank} />
         </div>
-        <Button asChild variant="outline" size="sm">
-          <a
-            href={`https://www.twitch.tv/${encodeURIComponent(streamer.login)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Twitchで見る
-            <ExternalLink data-icon="inline-end" />
-          </a>
-        </Button>
       </header>
-      <DeadlockActivity activity={data.deadlockActivity} />
       {fresh && data.live && (
         <LivePreview
           live={data.live}
@@ -133,6 +129,7 @@ export function StreamerDetailView({
           name={streamer.displayName}
         />
       )}
+      <DeadlockActivity activity={data.deadlockActivity} />
       <section className="flex flex-col gap-4" aria-labelledby="summary-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
