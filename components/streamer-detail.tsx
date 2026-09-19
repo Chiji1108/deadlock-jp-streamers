@@ -178,7 +178,7 @@ export function StreamerDetailView({
             最近の配信
           </h2>
           <span className="text-xs text-muted-foreground">
-            最新20件 · 観測した配信区間
+            最新20件
           </span>
         </div>
         {data.recentSessions.length ? (
@@ -203,7 +203,7 @@ export function StreamerDetailView({
                           {session.endedAt
                             ? `〜 ${dateTime(session.endedAt)}`
                             : fresh && data.isLive
-                              ? "観測継続中"
+                              ? "配信中"
                               : "最終観測時点"}
                         </span>
                       </div>
