@@ -38,7 +38,7 @@ export function StreamingHoursHeatmap({
         <CardTitle>
           <h2>配信している時間帯</h2>
         </CardTitle>
-        <CardDescription>直近90日間の観測割合 · 日本時間</CardDescription>
+        <CardDescription>直近90日間の観測割合</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div
@@ -125,16 +125,13 @@ export function StreamingHoursHeatmap({
           </div>
         </div>
       </CardContent>
-      <CardFooter className="mt-auto flex min-h-24 flex-col items-start gap-2">
-        <div aria-live="polite" className="min-h-5 text-sm">
-          {selected
-            ? label(selected)
-            : "時間帯に触れると観測割合を確認できます。"}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          濃いほどよく配信しています。配信予定ではありません。
-        </p>
-      </CardFooter>
+      {selected && (
+        <CardFooter className="mt-auto">
+          <div aria-live="polite" className="text-sm">
+            {label(selected)}
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
 }

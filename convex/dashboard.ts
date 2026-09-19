@@ -149,6 +149,7 @@ const detailResult = v.object({
       viewerCount: v.number(),
       startedAt: v.number(),
       lastSeenAt: v.number(),
+      thumbnailUrl: v.union(v.string(), v.null()),
     }),
   ),
   summary: v.object({ ...displayMetricFields, streamingDays: v.number() }),
@@ -293,6 +294,7 @@ export const detail = query({
             viewerCount: state.liveViewerCount ?? 0,
             startedAt: state.liveStartedAt ?? state.lastSeenAt,
             lastSeenAt: state.lastSeenAt,
+            thumbnailUrl: state.thumbnailUrl ?? null,
           }
         : null,
       summary: {

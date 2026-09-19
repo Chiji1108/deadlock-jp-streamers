@@ -4,12 +4,10 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { StreamingHoursHeatmap } from "./streaming-hours-heatmap";
-import { HeatmapCalendar } from "@/components/heatmap-calendar";
 import { api } from "@/convex/_generated/api";
 import {
   Avatar,
   CollectionNotice,
-  LiveBadge,
   LoadingPanel,
   Metric,
   PeriodPicker,
@@ -29,7 +27,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LivePreview } from "./live-preview";
 import {
   Empty,
   EmptyHeader,
@@ -86,7 +84,7 @@ export function StreamerDetailView({
   fresh: boolean;
   onPeriodChange: (period: Period) => void;
 }) {
-  const { streamer, summary, calendar, period } = data;
+  const { streamer, summary, period } = data;
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div>
@@ -112,12 +110,6 @@ export function StreamerDetailView({
               <span className="text-sm text-muted-foreground">
                 @{streamer.login}
               </span>
-              {fresh && data.isLive && (
-                <LiveBadge
-                  viewers={data.live?.viewerCount}
-                  startedAt={data.live?.startedAt}
-                />
-              )}
             </div>
           </div>
         </div>
@@ -133,14 +125,11 @@ export function StreamerDetailView({
         </Button>
       </header>
       {fresh && data.live && (
-        <Alert>
-          <AlertDescription>
-            配信中：{data.live.title}
-            <span className="mt-1 block text-xs">
-              {dateTime(data.live.startedAt)} 開始
-            </span>
-          </AlertDescription>
-        </Alert>
+        <LivePreview
+          live={data.live}
+          login={streamer.login}
+          name={streamer.displayName}
+        />
       )}
       <section className="flex flex-col gap-4" aria-labelledby="summary-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -176,51 +165,7 @@ export function StreamerDetailView({
           {dateTime(streamer.firstSeenAt)} JST
         </p>
       </section>
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <HeatmapCalendar
-          title={<h2>日別の配信時間</h2>}
-          description="直近90日間 · 日本時間"
-          data={calendar.map((day) => ({
-            date: day.date,
-            value: day.durationSeconds / 3600,
-          }))}
-          rangeDays={calendar.length || 90}
-          endDate={
-            calendar.length
-              ? new Date(`${calendar.at(-1)!.date}T00:00:00Z`)
-              : undefined
-          }
-          cellSize={16}
-          cellGap={4}
-          thresholds={[2, 4, 8]}
-          axisLabels={{
-            weekdayIndices: [0, 1, 2, 3, 4, 5, 6],
-            minWeekSpacing: 2,
-          }}
-          legend={{
-            placement: "bottom",
-            lessText: "短い",
-            moreText: "長い",
-            showArrow: true,
-          }}
-          getCellLabel={(cell) =>
-            `${cell.label}：${cell.value > 0 ? `配信 ${number(cell.value, 2)}時間` : "配信の記録なし"}`
-          }
-          renderTooltip={(cell) => (
-            <span>
-              {cell.label}：
-              {cell.value > 0
-                ? `配信 ${number(cell.value, 2)}時間`
-                : "配信の記録なし"}
-            </span>
-          )}
-          footer={
-            <p className="text-xs text-muted-foreground">
-              {calendar[0]?.date ?? "—"} 〜 {calendar.at(-1)?.date ?? "—"} ·
-              濃さは2・4・8時間を目安に表示しています。
-            </p>
-          }
-        />
+      <div className="w-full min-w-0 max-w-xl">
         <StreamingHoursHeatmap cells={data.heatmap} />
       </div>
       <section

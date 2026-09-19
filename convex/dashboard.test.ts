@@ -481,3 +481,30 @@ test.each(["week", "month", "quarter", "all"] as const)(
     }
   },
 );
+
+test("live thumbnail reaches detail and is cleared when the stream ends", async () => {
+  const t = setup();
+  const observation = {
+    ...live(),
+    thumbnailUrl:
+      "https://static-cdn.jtvnw.net/previews-ttv/live_user_player-640x360.jpg",
+  };
+  await observe(t, initial, observation);
+  const detail = await t.query(api.dashboard.detail, {
+    twitchId: "1",
+    period: "week",
+  });
+  expect(detail?.live?.thumbnailUrl).toBe(observation.thumbnailUrl);
+  await observe(t, initial + 60_000, null);
+  expect(
+    (await t.query(api.dashboard.detail, { twitchId: "1", period: "week" }))
+      ?.live,
+  ).toBeNull();
+  const state = await t.run(async (ctx) =>
+    ctx.db
+      .query("streamerState")
+      .withIndex("by_twitchId", (q) => q.eq("twitchId", "1"))
+      .unique(),
+  );
+  expect(state?.thumbnailUrl).toBeNull();
+});

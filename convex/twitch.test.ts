@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { TwitchClient } from "./twitch";
+import { TwitchClient, thumbnailUrl } from "./twitch";
 const stream = {
   id: "stream",
   user_id: "user",
@@ -83,4 +83,39 @@ test("expired Twitch tokens refresh once and preserve the request", async () => 
     await new TwitchClient("client", "secret", request).discover("deadlock"),
   ).toEqual([stream]);
   expect(request).toHaveBeenCalledTimes(4);
+});
+
+test("stream thumbnails use the Twitch CDN and requested dimensions; missing previews are harmless", async () => {
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(json({ access_token: "token" }))
+    .mockResolvedValueOnce(
+      json({
+        data: [
+          {
+            ...stream,
+            thumbnail_url:
+              "https://static-cdn.jtvnw.net/previews-ttv/live_user_login-{width}x{height}.jpg",
+          },
+        ],
+      }),
+    );
+  const result = await new TwitchClient("client", "secret", request).discover(
+    "deadlock",
+  );
+  expect(result[0].thumbnail_url).toBe(
+    "https://static-cdn.jtvnw.net/previews-ttv/live_user_login-640x360.jpg",
+  );
+});
+
+test.each([
+  undefined,
+  null,
+  "",
+  "bad url",
+  "http://static-cdn.jtvnw.net/a.jpg",
+  "https://example.com/a.jpg",
+  "https://static-cdn.jtvnw.net.example.com/a.jpg",
+])("unusable thumbnail %s is ignored", (value) => {
+  expect(thumbnailUrl(value)).toBeNull();
 });

@@ -295,6 +295,7 @@ export const applyObservation = internalMutation({
       lastSeenAt: live ? observedAt : previous!.lastSeenAt,
       liveViewerCount: live?.viewerCount ?? null,
       liveStartedAt: live?.twitchStartedAt ?? null,
+      thumbnailUrl: live?.thumbnailUrl ?? null,
       title: live?.title ?? null,
       durationSeconds: (previous?.durationSeconds ?? 0) + addedSeconds,
       viewerSeconds: (previous?.viewerSeconds ?? 0) + addedViewers,

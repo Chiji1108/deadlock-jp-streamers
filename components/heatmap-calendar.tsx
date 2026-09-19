@@ -692,14 +692,16 @@ export function HeatmapCalendar({
           </div>
         </TooltipProvider>
       </CardContent>
-      <CardFooter className="mt-auto flex min-h-24 flex-col items-start gap-2">
-        <div aria-live="polite" className="min-h-5 text-sm">
-          {selected
-            ? tooltipNode(selected)
-            : "日付に触れると配信時間を確認できます。"}
-        </div>
-        {footer}
-      </CardFooter>
+      {(selected || footer) && (
+        <CardFooter className="mt-auto flex flex-col items-start gap-2">
+          {selected && (
+            <div aria-live="polite" className="text-sm">
+              {tooltipNode(selected)}
+            </div>
+          )}
+          {footer}
+        </CardFooter>
+      )}
     </Card>
   );
 }

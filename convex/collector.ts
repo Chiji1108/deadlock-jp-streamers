@@ -90,6 +90,9 @@ export const collect = internalAction({
                   title: stream.title,
                   viewerCount: stream.viewer_count,
                   twitchStartedAt: Date.parse(stream.started_at),
+                  ...(stream.thumbnail_url
+                    ? { thumbnailUrl: stream.thumbnail_url }
+                    : {}),
                   ...(portraits.has(id)
                     ? { profileImageUrl: portraits.get(id)! }
                     : {}),

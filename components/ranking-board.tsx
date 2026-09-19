@@ -243,7 +243,6 @@ export function RankingBoard() {
             ? `${dateTime(stats.lastCollectedAt)} JST`
             : "—"}
         </span>
-        <span>当日を含む日本時間の集計</span>
       </div>
     </>
   );

@@ -54,6 +54,7 @@ export const liveObservation = v.object({
   title: v.string(),
   viewerCount: v.number(),
   twitchStartedAt: v.number(),
+  thumbnailUrl: v.optional(v.string()),
   profileImageUrl: v.optional(v.string()),
 });
 export const collectorStatus = v.union(

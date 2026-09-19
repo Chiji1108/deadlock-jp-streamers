@@ -21,6 +21,7 @@ export default defineSchema({
     lastSeenAt: v.number(),
     liveViewerCount: v.union(v.number(), v.null()),
     liveStartedAt: v.union(v.number(), v.null()),
+    thumbnailUrl: v.optional(v.union(v.string(), v.null())),
     title: v.union(v.string(), v.null()),
     ...metricFields,
   })

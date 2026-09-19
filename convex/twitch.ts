@@ -10,6 +10,7 @@ export interface TwitchStream {
   title: string;
   viewer_count: number;
   started_at: string;
+  thumbnail_url?: string;
 }
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -25,6 +26,24 @@ function rows(value: unknown) {
   if (!Array.isArray(data)) throw new Error("Malformed Twitch data");
   return data;
 }
+export function thumbnailUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const url = new URL(
+      value.replaceAll("{width}", "640").replaceAll("{height}", "360"),
+    );
+    if (
+      url.protocol !== "https:" ||
+      url.hostname !== "static-cdn.jtvnw.net" ||
+      url.username ||
+      url.password
+    )
+      return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 function parseStream(value: unknown): TwitchStream {
   const row = object(value);
   const result = {
@@ -37,6 +56,9 @@ function parseStream(value: unknown): TwitchStream {
     title: string(row.title),
     viewer_count: row.viewer_count,
     started_at: string(row.started_at),
+    ...(thumbnailUrl(row.thumbnail_url)
+      ? { thumbnail_url: thumbnailUrl(row.thumbnail_url)! }
+      : {}),
   };
   if (
     !result.id ||
