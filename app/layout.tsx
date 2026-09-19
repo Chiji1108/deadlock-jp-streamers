@@ -11,8 +11,8 @@ import { Separator } from "@/components/ui/separator";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 export const metadata: Metadata = {
   title: {
-    default: "Deadlock日本配信者ボード",
-    template: "%s | Deadlock日本配信者ボード",
+    default: "Deadlock 日本語Twitch配信者ボード",
+    template: "%s | Deadlock 日本語Twitch配信者ボード",
   },
   description:
     "日本語Deadlock配信者の配信時間・視聴者数・配信状況を確認できます。",
@@ -33,7 +33,7 @@ export default function RootLayout({
             </a>
             <header className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
               <Link href="/" className="text-sm font-semibold tracking-tight">
-                Deadlock日本配信者ボード
+                Deadlock 日本語Twitch配信者ボード
               </Link>
               <nav aria-label="メインナビゲーション">
                 <Button asChild variant="ghost" size="sm">

@@ -164,7 +164,7 @@ export function RankingBoard() {
   const rows = liveOnly && !fresh ? [] : results;
   return (
     <>
-      <h1 className="sr-only">Deadlock日本配信者ボード</h1>
+      <h1 className="sr-only">Deadlock 日本語Twitch配信者ボード</h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PeriodPicker
           period={period}
