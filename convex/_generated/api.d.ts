@@ -8,7 +8,16 @@
  * @module
  */
 
-import type * as myFunctions from "../myFunctions.js";
+import type * as aggregates from "../aggregates.js";
+import type * as collectionState from "../collectionState.js";
+import type * as collector from "../collector.js";
+import type * as crons from "../crons.js";
+import type * as dashboard from "../dashboard.js";
+import type * as ingestion from "../ingestion.js";
+import type * as maintenance from "../maintenance.js";
+import type * as model from "../model.js";
+import type * as time from "../time.js";
+import type * as twitch from "../twitch.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +26,16 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  myFunctions: typeof myFunctions;
+  aggregates: typeof aggregates;
+  collectionState: typeof collectionState;
+  collector: typeof collector;
+  crons: typeof crons;
+  dashboard: typeof dashboard;
+  ingestion: typeof ingestion;
+  maintenance: typeof maintenance;
+  model: typeof model;
+  time: typeof time;
+  twitch: typeof twitch;
 }>;
 
 /**
@@ -46,4 +64,8 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  duration: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"duration">;
+  watched: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"watched">;
+  activeDays: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"activeDays">;
+};

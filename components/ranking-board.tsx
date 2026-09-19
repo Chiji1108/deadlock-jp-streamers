@@ -1,0 +1,250 @@
+"use client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUpDown } from "lucide-react";
+import { usePaginatedQuery, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "@/convex/_generated/api";
+import {
+  Avatar,
+  CollectionNotice,
+  LiveBadge,
+  LoadingPanel,
+  PeriodPicker,
+  dateTime,
+  number,
+  useFilters,
+  useFreshness,
+  type Period,
+} from "./dashboard-ui";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from "@/components/ui/table";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
+
+export type RankingRow = FunctionReturnType<
+  typeof api.dashboard.ranking
+>["page"][number];
+type Sort = "duration" | "viewers" | "watched" | "peak";
+const sorts = [
+  { key: "duration", label: "合計配信時間 (h)" },
+  { key: "viewers", label: "平均視聴者" },
+  { key: "watched", label: "総視聴時間 (人時)" },
+  { key: "peak", label: "ピーク視聴者" },
+] as const;
+
+export function RankingTable({
+  rows,
+  period,
+  sort,
+  onSort,
+  fresh,
+}: {
+  rows: RankingRow[];
+  period: Period;
+  sort: Sort;
+  onSort: (sort: Sort) => void;
+  fresh: boolean;
+}) {
+  const router = useRouter();
+  return (
+    <Table>
+      <TableCaption className="sr-only">日本語Deadlock配信者一覧</TableCaption>
+      <TableHeader>
+        <TableRow>
+          <TableHead>配信者</TableHead>
+          {sorts.map((item) => (
+            <TableHead
+              key={item.key}
+              className="text-right"
+              aria-sort={sort === item.key ? "descending" : "none"}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSort(item.key)}
+                aria-label={`${item.label}の多い順に並べ替え`}
+              >
+                {item.label}
+                {sort === item.key ? (
+                  <ArrowDown data-icon="inline-end" />
+                ) : (
+                  <ArrowUpDown data-icon="inline-end" />
+                )}
+              </Button>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow
+            key={row.twitchId}
+            className="cursor-pointer focus-within:bg-muted/50"
+            onClick={(event) => {
+              if (
+                (event.target as HTMLElement).closest("a, button") ||
+                window.getSelection()?.toString()
+              )
+                return;
+              const href = `/streamers/${row.twitchId}?period=${period}`;
+              if (event.metaKey || event.ctrlKey)
+                window.open(href, "_blank", "noopener,noreferrer");
+              else router.push(href);
+            }}
+          >
+            <TableCell>
+              <div className="flex min-w-40 items-center gap-3 py-1">
+                <Avatar name={row.displayName} url={row.profileImageUrl} />
+                <div className="flex min-w-0 flex-col gap-1">
+                  <Link
+                    className="max-w-52 truncate font-medium hover:underline"
+                    href={`/streamers/${row.twitchId}?period=${period}`}
+                  >
+                    {row.displayName}
+                  </Link>
+                  {fresh && row.isLive ? (
+                    <LiveBadge
+                      viewers={row.liveViewerCount}
+                      startedAt={row.liveStartedAt}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      @{row.login}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {number(row.hoursStreamed, 1)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {number(row.averageViewers, 1)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {number(row.hoursWatched, 1)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {number(row.peakViewers)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+export function RankingBoard() {
+  const { period, search, update } = useFilters();
+  const rawSort = search.get("sort");
+  const sort: Sort =
+    rawSort === "viewers" || rawSort === "watched" || rawSort === "peak"
+      ? rawSort
+      : "duration";
+  const liveOnly = search.get("live") === "true";
+  const stats = useQuery(api.dashboard.status, {});
+  const fresh = useFreshness(stats?.lastCollectedAt);
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.dashboard.ranking,
+    { period, sort, liveOnly },
+    { initialNumItems: 30 },
+  );
+  const rows = liveOnly && !fresh ? [] : results;
+  return (
+    <>
+      <h1 className="sr-only">Deadlock日本配信者ボード</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <PeriodPicker
+          period={period}
+          onChange={(value) => update({ period: value })}
+        />
+        <FieldGroup className="w-32 shrink-0">
+          <Field orientation="horizontal">
+            <Switch
+              id="live-only"
+              checked={liveOnly}
+              onCheckedChange={(checked) => update({ live: String(checked) })}
+            />
+            <FieldLabel htmlFor="live-only">配信中のみ</FieldLabel>
+          </Field>
+        </FieldGroup>
+      </div>
+      <CollectionNotice />
+      {status === "LoadingFirstPage" ? (
+        <LoadingPanel />
+      ) : rows.length ? (
+        <div className="min-w-0 rounded-lg border">
+          <RankingTable
+            rows={rows}
+            period={period}
+            sort={sort}
+            onSort={(value) => update({ sort: value })}
+            fresh={fresh}
+          />
+        </div>
+      ) : (
+        <Empty className="min-h-52 border">
+          <EmptyHeader>
+            <EmptyTitle>
+              {liveOnly
+                ? fresh
+                  ? "現在、配信中の人はいません"
+                  : "配信状況を確認しています"
+                : "配信データはまだありません"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {liveOnly
+                ? "新しい観測が届くと自動で更新されます。"
+                : "日本語のDeadlock配信を観測すると、ここに表示されます。"}
+            </EmptyDescription>
+          </EmptyHeader>
+          {liveOnly && (
+            <EmptyContent>
+              <Button
+                variant="outline"
+                onClick={() => update({ live: "false" })}
+              >
+                すべての配信者を見る
+              </Button>
+            </EmptyContent>
+          )}
+        </Empty>
+      )}
+      {status !== "Exhausted" && rows.length > 0 && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            disabled={status !== "CanLoadMore"}
+            onClick={() => loadMore(30)}
+          >
+            {status === "LoadingMore" ? "読み込み中…" : "さらに30人を見る"}
+          </Button>
+        </div>
+      )}
+      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          最終観測{" "}
+          {stats?.lastCollectedAt
+            ? `${dateTime(stats.lastCollectedAt)} JST`
+            : "—"}
+        </span>
+        <span>当日を含む日本時間の集計</span>
+      </div>
+    </>
+  );
+}
