@@ -188,6 +188,7 @@ export function StreamerDetailView({
                   <TableHead className="text-right">配信時間</TableHead>
                   <TableHead className="text-right">平均視聴者</TableHead>
                   <TableHead className="text-right">ピーク視聴者</TableHead>
+                  <TableHead className="text-right">総視聴時間</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -218,6 +219,9 @@ export function StreamerDetailView({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {number(session.peakViewers)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {number(session.hoursWatched, 1)}
                     </TableCell>
                   </TableRow>
                 ))}
