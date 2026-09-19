@@ -10,7 +10,7 @@ import {
 import { dateTime } from "./dashboard-ui";
 import type { RankingRow } from "./ranking-board";
 const names = [
-  "ランク認定中",
+  "Obscurus",
   "Initiate",
   "Seeker",
   "Acolyte",
@@ -41,9 +41,11 @@ export function DeadlockRank({
         ? names[0]
         : `${names[rank.tier]} ${rank.subrank}`;
   const src =
-    rank.tier && rank.subrank
-      ? `https://api.deadlock-api.com/v1/assets/ranks/${rank.tier}/${rank.subrank}/image?format=webp`
-      : null;
+    rank.tier === 0
+      ? "https://assets-bucket.deadlock-api.com/assets-api-res/images/ranks/rank00_lg.webp"
+      : rank.tier && rank.subrank
+        ? `https://api.deadlock-api.com/v1/assets/ranks/${rank.tier}/${rank.subrank}/image?format=webp`
+        : null;
   const content = (
     <>
       {src && failedSrc !== src && (
@@ -83,7 +85,7 @@ export function DeadlockRank({
           {rank.tier === null
             ? "Deadlock APIでランクを確認できていません。"
             : rank.tier === 0
-              ? "直近のランクマッチにランク情報がありません。"
+              ? "ランク認定中"
               : "直近のランクマッチをもとに表示"}
         </p>
         {rank.updatedAt && <p>最終確認 {dateTime(rank.updatedAt)} JST</p>}
