@@ -135,7 +135,7 @@ export function StreamerDetailView({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 id="summary-title" className="text-base font-semibold">
-              {period === "all" ? "累計" : periodLabels[period]}の集計
+              {period === "all" ? "累計" : `${periodLabels[period]}の集計`}
             </h2>
             <span className="text-xs text-muted-foreground">
               配信日数 {number(summary.streamingDays)}日
@@ -186,7 +186,7 @@ export function StreamerDetailView({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>観測開始</TableHead>
+                  <TableHead>配信時刻</TableHead>
                   <TableHead>タイトル</TableHead>
                   <TableHead className="text-right">配信時間</TableHead>
                   <TableHead className="text-right">平均視聴者</TableHead>

@@ -2,6 +2,11 @@
 import { useEffect, useState } from "react";
 import { useConvexConnectionState, useQuery } from "convex/react";
 import { usePathname, useSearchParams } from "next/navigation";
+import {
+  availablePeriods,
+  resolvePeriod,
+  MEASUREMENT_START_LABEL,
+} from "@/lib/period-availability";
 import { api } from "@/convex/_generated/api";
 import {
   Avatar as UIAvatar,
@@ -45,8 +50,14 @@ export function useFilters() {
   const search = useSearchParams();
   const pathname = usePathname();
   const raw = search.get("period");
-  const period: Period =
-    raw === "month" || raw === "quarter" || raw === "all" ? raw : "week";
+  const stats = useQuery(api.dashboard.status, {});
+  const period = resolvePeriod(raw, stats?.lastCollectedAt);
+  useEffect(() => {
+    if (stats === undefined || raw === null || raw === period) return;
+    const params = new URLSearchParams(search.toString());
+    params.set("period", period);
+    window.history.replaceState(null, "", `${pathname}?${params}`);
+  }, [stats, raw, period, search, pathname]);
   function update(values: Record<string, string>) {
     const params = new URLSearchParams(search.toString());
     Object.entries(values).forEach(([key, value]) => params.set(key, value));
@@ -76,26 +87,40 @@ export function PeriodPicker({
   period: Period;
   onChange: (period: Period) => void;
 }) {
+  const stats = useQuery(api.dashboard.status, {});
+  const choices = availablePeriods(stats?.lastCollectedAt);
+  if (choices.length === 1)
+    return (
+      <span className="text-sm text-muted-foreground">
+        {MEASUREMENT_START_LABEL}
+      </span>
+    );
   return (
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      size="sm"
-      spacing={0}
-      value={period}
-      onValueChange={(value) => {
-        if (value) onChange(value as Period);
-      }}
-      aria-label="集計期間"
-    >
-      {(Object.keys(periodLabels) as Period[]).map((value) => (
-        <ToggleGroupItem key={value} value={value}>
-          {periodLabels[value]}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <div className="flex flex-col gap-1.5">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        spacing={0}
+        value={period}
+        onValueChange={(value) => {
+          if (value) onChange(value as Period);
+        }}
+        aria-label="集計期間"
+      >
+        {choices.map((value) => (
+          <ToggleGroupItem key={value} value={value}>
+            {periodLabels[value]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      <span className="text-xs text-muted-foreground">
+        {MEASUREMENT_START_LABEL}
+      </span>
+    </div>
   );
 }
+
 export function Avatar({
   name,
   url,

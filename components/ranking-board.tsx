@@ -212,7 +212,7 @@ export function RankingBoard() {
           period={period}
           onChange={(value) => update({ period: value })}
         />
-        <FieldGroup className="w-32 shrink-0">
+        <FieldGroup className="ml-auto w-32 shrink-0">
           <Field orientation="horizontal">
             <Switch
               id="live-only"
