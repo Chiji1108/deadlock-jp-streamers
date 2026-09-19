@@ -96,3 +96,34 @@ test("distinguishes no results, throttling, malformed data, and network errors",
     ).rejects.toThrow("検索できません");
   }
 });
+
+test("player names require admin, batch exact account ids, and ignore unrelated profiles", async () => {
+  const fetchMock = vi.fn<(url: string) => Promise<Response>>(
+    async () =>
+      new Response(
+        JSON.stringify([
+          { account_id: 12, personaname: "Player" },
+          { account_id: 99, personaname: "Unrelated" },
+          { account_id: 13, personaname: null },
+        ]),
+      ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(
+    convexTest(schema, modules).action(api.admin.steamPlayerNames, {
+      accountIds: [12],
+    }),
+  ).rejects.toThrow("管理者権限");
+  await expect(
+    admin().action(api.admin.steamPlayerNames, {
+      accountIds: Array(51).fill(12),
+    }),
+  ).rejects.toThrow("不正");
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(
+    await admin().action(api.admin.steamPlayerNames, { accountIds: [12, 13] }),
+  ).toEqual([{ accountId: 12, name: "Player" }]);
+  expect(
+    new URL(fetchMock.mock.calls[0][0]).searchParams.get("account_ids"),
+  ).toBe("12,13");
+});

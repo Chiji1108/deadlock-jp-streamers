@@ -1,3 +1,4 @@
+import { syncRankOrder } from "./rankOrdering";
 import { ConvexError, v } from "convex/values";
 import {
   internalMutation,
@@ -45,6 +46,7 @@ export const link = internalMutation({
       unavailable: false,
       nextRefreshAt: Date.now() + HOUR,
     });
+    await syncRankOrder(ctx, twitchId, null);
     await ctx.scheduler.runAfter(0, internal.steamLinks.refresh, { id });
     return null;
   },
@@ -58,6 +60,7 @@ export const unlink = internalMutation({
       .withIndex("by_twitchId", (q) => q.eq("twitchId", twitchId))
       .unique();
     if (row) await ctx.db.delete("steamLinks", row._id);
+    await syncRankOrder(ctx, twitchId, null);
     return null;
   },
 });
@@ -105,6 +108,7 @@ export const save = internalMutation({
       updatedAt: attemptedAt,
       unavailable: result === null,
     });
+    await syncRankOrder(ctx, row.twitchId, result);
     return null;
   },
 });

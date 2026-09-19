@@ -2,7 +2,7 @@
 import { DeadlockRank } from "./deadlock-rank";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
@@ -40,7 +40,7 @@ import {
 export type RankingRow = FunctionReturnType<
   typeof api.dashboard.ranking
 >["page"][number];
-type Sort = "duration" | "viewers" | "watched" | "peak";
+type Sort = "duration" | "viewers" | "watched" | "peak" | "rank" | "rankAsc";
 const sorts = [
   { key: "duration", label: "合計配信時間" },
   { key: "viewers", label: "平均視聴者" },
@@ -68,6 +68,31 @@ export function RankingTable({
       <TableHeader>
         <TableRow>
           <TableHead>配信者</TableHead>
+          <TableHead
+            aria-sort={
+              sort === "rank"
+                ? "descending"
+                : sort === "rankAsc"
+                  ? "ascending"
+                  : "none"
+            }
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSort(sort === "rank" ? "rankAsc" : "rank")}
+              aria-label={`ランクの${sort === "rank" ? "低い" : "高い"}順に並べ替え`}
+            >
+              ランク
+              {sort === "rank" ? (
+                <ArrowDown data-icon="inline-end" />
+              ) : sort === "rankAsc" ? (
+                <ArrowUp data-icon="inline-end" />
+              ) : (
+                <ArrowUpDown data-icon="inline-end" />
+              )}
+            </Button>
+          </TableHead>
           {sorts.map((item) => (
             <TableHead
               key={item.key}
@@ -110,23 +135,36 @@ export function RankingTable({
           >
             <TableCell>
               <div className="flex min-w-40 items-center gap-3 py-1">
-                <Avatar name={row.displayName} url={row.profileImageUrl} />
-                <div className="flex min-w-0 max-w-60 flex-col gap-1 sm:max-w-96">
-                  <Link
-                    className="max-w-52 truncate font-medium hover:underline"
-                    href={`/streamers/${row.twitchId}?period=${period}`}
-                  >
-                    {row.displayName}
-                  </Link>
-                  <DeadlockRank rank={row.deadlockRank} />
-                  {fresh && row.isLive && (
-                    <LiveBadge
-                      viewers={row.liveViewerCount}
-                      startedAt={row.liveStartedAt}
-                    />
-                  )}
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar name={row.displayName} url={row.profileImageUrl} />
+                  <div className="flex min-w-0 max-w-60 flex-col gap-1 sm:max-w-96">
+                    <Link
+                      className="max-w-52 truncate font-medium hover:underline"
+                      href={`/streamers/${row.twitchId}?period=${period}`}
+                    >
+                      {row.displayName}
+                    </Link>
+                    {fresh && row.isLive && (
+                      <LiveBadge
+                        viewers={row.liveViewerCount}
+                        startedAt={row.liveStartedAt}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
+            </TableCell>
+            <TableCell>
+              {row.deadlockRank ? (
+                <DeadlockRank rank={row.deadlockRank} />
+              ) : (
+                <span
+                  className="text-muted-foreground"
+                  aria-label="ランク未登録"
+                >
+                  —
+                </span>
+              )}
             </TableCell>
             <TableCell className="text-right tabular-nums">
               {number(row.hoursStreamed, 1)}
@@ -150,7 +188,11 @@ export function RankingBoard() {
   const { period, search, update } = useFilters();
   const rawSort = search.get("sort");
   const sort: Sort =
-    rawSort === "viewers" || rawSort === "watched" || rawSort === "peak"
+    rawSort === "viewers" ||
+    rawSort === "watched" ||
+    rawSort === "peak" ||
+    rawSort === "rank" ||
+    rawSort === "rankAsc"
       ? rawSort
       : "duration";
   const liveOnly = search.get("live") === "true";

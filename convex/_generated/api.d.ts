@@ -19,6 +19,7 @@ import type * as ingestion from "../ingestion.js";
 import type * as maintenance from "../maintenance.js";
 import type * as matchLookup from "../matchLookup.js";
 import type * as model from "../model.js";
+import type * as rankOrdering from "../rankOrdering.js";
 import type * as steamLinks from "../steamLinks.js";
 import type * as steamSearch from "../steamSearch.js";
 import type * as time from "../time.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   maintenance: typeof maintenance;
   matchLookup: typeof matchLookup;
   model: typeof model;
+  rankOrdering: typeof rankOrdering;
   steamLinks: typeof steamLinks;
   steamSearch: typeof steamSearch;
   time: typeof time;

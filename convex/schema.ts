@@ -68,8 +68,22 @@ export default defineSchema({
     ...metricFields,
     averageViewers: v.number(),
     streamingDays: v.number(),
+    rankScore: v.optional(v.number()),
+    rankReverse: v.optional(v.number()),
   })
     .index("by_twitchId_and_period", ["twitchId", "period"])
+    .index("by_period_and_rankScore", ["period", "rankScore"])
+    .index("by_period_and_isLive_and_rankScore", [
+      "period",
+      "isLive",
+      "rankScore",
+    ])
+    .index("by_period_and_rankReverse", ["period", "rankReverse"])
+    .index("by_period_and_isLive_and_rankReverse", [
+      "period",
+      "isLive",
+      "rankReverse",
+    ])
     .index("by_period_and_durationSeconds", ["period", "durationSeconds"])
     .index("by_period_and_averageViewers", ["period", "averageViewers"])
     .index("by_period_and_viewerSeconds", ["period", "viewerSeconds"])

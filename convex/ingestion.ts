@@ -1,3 +1,4 @@
+import { rankOrder } from "./rankOrdering";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -18,6 +19,10 @@ export async function refreshRankings(
   state: Doc<"streamerState">,
   at: number,
 ) {
+  const rank = await ctx.db
+    .query("steamLinks")
+    .withIndex("by_twitchId", (q) => q.eq("twitchId", state.twitchId))
+    .unique();
   const day = dayStart(at);
   const ranges = periods.map((period) => ({
     namespace: state.twitchId,
@@ -79,6 +84,7 @@ export async function refreshRankings(
       averageViewers: durations[i] ? viewers[i] / durations[i] : 0,
       peakViewers: peak,
       streamingDays: days[i],
+      ...rankOrder(rank),
     };
     if (old) await ctx.db.replace("rankings", old._id, value);
     else await ctx.db.insert("rankings", value);

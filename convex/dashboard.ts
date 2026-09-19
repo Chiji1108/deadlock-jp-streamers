@@ -56,6 +56,8 @@ export const ranking = query({
       v.literal("viewers"),
       v.literal("watched"),
       v.literal("peak"),
+      v.literal("rank"),
+      v.literal("rankAsc"),
     ),
     liveOnly: v.boolean(),
     paginationOpts: paginationOptsValidator,
@@ -69,37 +71,57 @@ export const ranking = query({
     )
       throw new Error("Page size must be 1–100");
     const source = ctx.db.query("rankings");
-    const ordered = args.liveOnly
-      ? args.sort === "duration"
-        ? source.withIndex("by_period_and_isLive_and_durationSeconds", (q) =>
-            q.eq("period", args.period).eq("isLive", true),
-          )
-        : args.sort === "peak"
-          ? source.withIndex("by_period_and_isLive_and_peakViewers", (q) =>
-              q.eq("period", args.period).eq("isLive", true),
-            )
-          : args.sort === "viewers"
-            ? source.withIndex("by_period_and_isLive_and_averageViewers", (q) =>
+    const ordered =
+      args.sort === "rank" || args.sort === "rankAsc"
+        ? args.liveOnly
+          ? args.sort === "rank"
+            ? source.withIndex("by_period_and_isLive_and_rankScore", (q) =>
                 q.eq("period", args.period).eq("isLive", true),
               )
-            : source.withIndex("by_period_and_isLive_and_viewerSeconds", (q) =>
+            : source.withIndex("by_period_and_isLive_and_rankReverse", (q) =>
                 q.eq("period", args.period).eq("isLive", true),
               )
-      : args.sort === "duration"
-        ? source.withIndex("by_period_and_durationSeconds", (q) =>
-            q.eq("period", args.period),
-          )
-        : args.sort === "peak"
-          ? source.withIndex("by_period_and_peakViewers", (q) =>
-              q.eq("period", args.period),
-            )
-          : args.sort === "viewers"
-            ? source.withIndex("by_period_and_averageViewers", (q) =>
+          : args.sort === "rank"
+            ? source.withIndex("by_period_and_rankScore", (q) =>
                 q.eq("period", args.period),
               )
-            : source.withIndex("by_period_and_viewerSeconds", (q) =>
+            : source.withIndex("by_period_and_rankReverse", (q) =>
                 q.eq("period", args.period),
-              );
+              )
+        : args.liveOnly
+          ? args.sort === "duration"
+            ? source.withIndex(
+                "by_period_and_isLive_and_durationSeconds",
+                (q) => q.eq("period", args.period).eq("isLive", true),
+              )
+            : args.sort === "peak"
+              ? source.withIndex("by_period_and_isLive_and_peakViewers", (q) =>
+                  q.eq("period", args.period).eq("isLive", true),
+                )
+              : args.sort === "viewers"
+                ? source.withIndex(
+                    "by_period_and_isLive_and_averageViewers",
+                    (q) => q.eq("period", args.period).eq("isLive", true),
+                  )
+                : source.withIndex(
+                    "by_period_and_isLive_and_viewerSeconds",
+                    (q) => q.eq("period", args.period).eq("isLive", true),
+                  )
+          : args.sort === "duration"
+            ? source.withIndex("by_period_and_durationSeconds", (q) =>
+                q.eq("period", args.period),
+              )
+            : args.sort === "peak"
+              ? source.withIndex("by_period_and_peakViewers", (q) =>
+                  q.eq("period", args.period),
+                )
+              : args.sort === "viewers"
+                ? source.withIndex("by_period_and_averageViewers", (q) =>
+                    q.eq("period", args.period),
+                  )
+                : source.withIndex("by_period_and_viewerSeconds", (q) =>
+                    q.eq("period", args.period),
+                  );
     const result = await ordered.order("desc").paginate(args.paginationOpts);
     const page = await Promise.all(
       result.page.map(async (row) => {

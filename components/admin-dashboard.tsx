@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SignIn, UserButton, useAuth } from "@clerk/nextjs";
 import {
+  useAction,
   useConvexAuth,
   useMutation,
   usePaginatedQuery,
@@ -102,6 +103,40 @@ function AdminWorkspace() {
     { search },
     { initialNumItems: 30 },
   );
+  const getNames = useAction(api.admin.steamPlayerNames);
+  const [steamNames, setSteamNames] = useState<Record<number, string>>({});
+  const accountIds = JSON.stringify(
+    [
+      ...new Set(
+        results.flatMap((row) =>
+          row.deadlockRank ? [row.deadlockRank.accountId] : [],
+        ),
+      ),
+    ].sort((a, b) => a - b),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const ids: number[] = JSON.parse(accountIds);
+    async function loadNames() {
+      const names: Record<number, string> = {};
+      for (let i = 0; i < ids.length; i += 50) {
+        if (cancelled) return;
+        try {
+          for (const profile of await getNames({
+            accountIds: ids.slice(i, i + 50),
+          }))
+            names[profile.accountId] = profile.name;
+        } catch {
+          /* Keep the Steam ID visible if profiles are unavailable. */
+        }
+      }
+      if (!cancelled) setSteamNames(names);
+    }
+    void loadNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountIds, getNames]);
   const link = useMutation(api.admin.link);
   const unlink = useMutation(api.admin.unlink);
   return (
@@ -153,6 +188,7 @@ function AdminWorkspace() {
       ) : (
         <AdminStreamerList
           rows={results}
+          steamNames={steamNames}
           onSave={async (twitchId, steamAccount) => {
             await link({ twitchId, steamAccount });
             setNotice(
@@ -180,10 +216,12 @@ function AdminWorkspace() {
 }
 export function AdminStreamerList({
   rows,
+  steamNames = {},
   onSave,
   onUnlink,
 }: {
   rows: AdminRow[];
+  steamNames?: Record<number, string>;
   onSave: (twitchId: string, steamAccount: string) => Promise<void>;
   onUnlink: (twitchId: string) => Promise<void>;
 }) {
@@ -219,7 +257,22 @@ export function AdminStreamerList({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {row.deadlockRank ? (
-                <DeadlockRank rank={row.deadlockRank} />
+                <div className="flex flex-col items-start gap-1">
+                  <a
+                    href={`https://steamcommunity.com/profiles/${BigInt(row.deadlockRank.accountId) + BigInt("76561197960265728")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="max-w-64 truncate text-sm font-medium hover:underline"
+                    title={
+                      steamNames[row.deadlockRank.accountId] ??
+                      "Steamプレイヤーネーム未取得"
+                    }
+                  >
+                    {steamNames[row.deadlockRank.accountId] ??
+                      `Steam ID: ${row.deadlockRank.accountId}`}
+                  </a>
+                  <DeadlockRank rank={row.deadlockRank} />
+                </div>
               ) : (
                 <span className="text-xs text-muted-foreground">未登録</span>
               )}

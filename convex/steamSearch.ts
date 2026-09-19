@@ -65,3 +65,34 @@ export async function searchSteamProfiles(input: string) {
     );
   }
 }
+
+export async function steamNames(accountIds: number[]) {
+  if (
+    accountIds.length > 50 ||
+    accountIds.some((id) => !Number.isInteger(id) || id <= 0 || id > 4294967295)
+  )
+    throw new ConvexError("Steam IDの指定が不正です。");
+  if (!accountIds.length) return [];
+  try {
+    const response = await fetch(
+      `https://api.deadlock-api.com/v1/players/steam?account_ids=${[...new Set(accountIds)].join(",")}`,
+      { signal: AbortSignal.timeout(15000) },
+    );
+    if (response.status === 404) return [];
+    if (!response.ok) throw new Error("Profile lookup failed");
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) throw new Error("Invalid profiles");
+    return data.flatMap((value: unknown) => {
+      if (!value || typeof value !== "object") return [];
+      const p = value as Record<string, unknown>;
+      return typeof p.account_id === "number" &&
+        accountIds.includes(p.account_id) &&
+        typeof p.personaname === "string" &&
+        p.personaname.trim()
+        ? [{ accountId: p.account_id, name: p.personaname }]
+        : [];
+    });
+  } catch {
+    throw new ConvexError("Steamのプレイヤーネームを取得できませんでした。");
+  }
+}

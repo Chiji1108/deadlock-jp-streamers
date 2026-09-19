@@ -1,4 +1,4 @@
-import { searchSteamProfiles, steamProfile } from "./steamSearch";
+import { searchSteamProfiles, steamProfile, steamNames } from "./steamSearch";
 import { ConvexError, v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -151,5 +151,14 @@ export const searchSteam = action({
   handler: async (ctx, { search }) => {
     await requireAdmin(ctx);
     return await searchSteamProfiles(search);
+  },
+});
+
+export const steamPlayerNames = action({
+  args: { accountIds: v.array(v.number()) },
+  returns: v.array(v.object({ accountId: v.number(), name: v.string() })),
+  handler: async (ctx, { accountIds }) => {
+    await requireAdmin(ctx);
+    return await steamNames(accountIds);
   },
 });
