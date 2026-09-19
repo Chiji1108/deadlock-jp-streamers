@@ -3,12 +3,19 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { env, query, mutation, type QueryCtx } from "./_generated/server";
+import {
+  env,
+  query,
+  mutation,
+  action,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
+import { lookupMatch, matchPlayer } from "./matchLookup";
 import { deadlockRank } from "./model";
 import { rankForStreamer } from "./steamLinks";
 
-async function adminIdentity(ctx: QueryCtx) {
+async function adminIdentity(ctx: Pick<QueryCtx, "auth">) {
   const identity = await ctx.auth.getUserIdentity();
   const issuer = env.CLERK_JWT_ISSUER_DOMAIN;
   const admins = (env.CLERK_ADMIN_USER_IDS ?? "")
@@ -24,7 +31,7 @@ async function adminIdentity(ctx: QueryCtx) {
       admins.includes(identity.subject),
   };
 }
-async function requireAdmin(ctx: QueryCtx) {
+async function requireAdmin(ctx: Pick<QueryCtx, "auth">) {
   if (!(await adminIdentity(ctx)).isAdmin)
     throw new ConvexError("管理者権限が必要です");
 }
@@ -121,5 +128,18 @@ export const unlink = mutation({
     await requireAdmin(ctx);
     await ctx.runMutation(internal.steamLinks.unlink, args);
     return null;
+  },
+});
+
+export const matchParticipants = action({
+  args: { matchId: v.string() },
+  returns: v.object({
+    matchId: v.number(),
+    players: v.array(matchPlayer),
+    partial: v.boolean(),
+  }),
+  handler: async (ctx, { matchId }) => {
+    await requireAdmin(ctx);
+    return await lookupMatch(matchId);
   },
 });

@@ -17,6 +17,7 @@ import type * as dashboard from "../dashboard.js";
 import type * as deadlock from "../deadlock.js";
 import type * as ingestion from "../ingestion.js";
 import type * as maintenance from "../maintenance.js";
+import type * as matchLookup from "../matchLookup.js";
 import type * as model from "../model.js";
 import type * as steamLinks from "../steamLinks.js";
 import type * as time from "../time.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   deadlock: typeof deadlock;
   ingestion: typeof ingestion;
   maintenance: typeof maintenance;
+  matchLookup: typeof matchLookup;
   model: typeof model;
   steamLinks: typeof steamLinks;
   time: typeof time;

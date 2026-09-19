@@ -12,6 +12,7 @@ import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
+import { AdminMatchRegistration } from "./admin-match-registration";
 import { DeadlockRank } from "./deadlock-rank";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -104,6 +105,7 @@ function AdminWorkspace() {
   const unlink = useMutation(api.admin.unlink);
   return (
     <>
+      <AdminMatchRegistration />
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -238,7 +240,15 @@ export function AdminStreamerList({
 function AdminLiveBadge({ row }: { row: AdminRow }) {
   const fresh = useFreshness(row.lastSeenAt);
   return row.isLive && fresh ? (
-    <LiveBadge viewers={row.liveViewerCount} startedAt={row.liveStartedAt} />
+    <a
+      href={`https://www.twitch.tv/${encodeURIComponent(row.login)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${row.displayName}のライブ配信をTwitchで開く（別タブ）`}
+      className="w-fit rounded-full transition-opacity hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <LiveBadge viewers={row.liveViewerCount} startedAt={row.liveStartedAt} />
+    </a>
   ) : null;
 }
 function SteamEditor({
