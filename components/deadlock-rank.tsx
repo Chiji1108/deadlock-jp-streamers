@@ -10,7 +10,7 @@ import {
 import { dateTime } from "./dashboard-ui";
 import type { RankingRow } from "./ranking-board";
 const names = [
-  "ランク未確定",
+  "ランク認定中",
   "Initiate",
   "Seeker",
   "Acolyte",
@@ -23,7 +23,13 @@ const names = [
   "Ascendant",
   "Eternus",
 ];
-export function DeadlockRank({ rank }: { rank: RankingRow["deadlockRank"] }) {
+export function DeadlockRank({
+  rank,
+  plain = false,
+}: {
+  rank: RankingRow["deadlockRank"];
+  plain?: boolean;
+}) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   if (!rank) return null;
   const label =
@@ -38,6 +44,21 @@ export function DeadlockRank({ rank }: { rank: RankingRow["deadlockRank"] }) {
     rank.tier && rank.subrank
       ? `https://api.deadlock-api.com/v1/assets/ranks/${rank.tier}/${rank.subrank}/image?format=webp`
       : null;
+  const content = (
+    <>
+      {src && failedSrc !== src && (
+        <Image
+          src={src}
+          alt=""
+          width={20}
+          height={20}
+          unoptimized
+          onError={() => setFailedSrc(src)}
+        />
+      )}
+      {label}
+    </>
+  );
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -48,19 +69,13 @@ export function DeadlockRank({ rank }: { rank: RankingRow["deadlockRank"] }) {
           rel="noopener noreferrer"
           aria-label={`${label} — Steamプロフィール`}
         >
-          <Badge variant="secondary">
-            {src && failedSrc !== src && (
-              <Image
-                src={src}
-                alt=""
-                width={20}
-                height={20}
-                unoptimized
-                onError={() => setFailedSrc(src)}
-              />
-            )}
-            {label}
-          </Badge>
+          {plain ? (
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+              {content}
+            </span>
+          ) : (
+            <Badge variant="secondary">{content}</Badge>
+          )}
         </a>
       </TooltipTrigger>
       <TooltipContent>

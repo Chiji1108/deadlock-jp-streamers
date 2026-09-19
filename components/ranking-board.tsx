@@ -156,7 +156,7 @@ export function RankingTable({
             </TableCell>
             <TableCell>
               {row.deadlockRank ? (
-                <DeadlockRank rank={row.deadlockRank} />
+                <DeadlockRank rank={row.deadlockRank} plain />
               ) : (
                 <span
                   className="text-muted-foreground"
