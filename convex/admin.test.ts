@@ -178,3 +178,43 @@ test("live streamers precede offline streamers across pages and expose live badg
   });
   expect(search.page[0].isLive).toBe(true);
 });
+
+test("unlinked-only excludes linked accounts even while ranks are pending and preserves pagination", async () => {
+  const t = await setup();
+  const admin = t.withIdentity({ subject: "user_admin", issuer });
+  await admin.mutation(api.admin.link, {
+    twitchId: "1",
+    steamAccount: "12345",
+  });
+  const first = await admin.query(api.admin.streamers, {
+    search: "",
+    unlinkedOnly: true,
+    paginationOpts: { numItems: 1, cursor: null },
+  });
+  expect(first.page).toEqual([]);
+  expect(first.isDone).toBe(false);
+  const second = await admin.query(api.admin.streamers, {
+    search: "",
+    unlinkedOnly: true,
+    paginationOpts: { numItems: 1, cursor: first.continueCursor },
+  });
+  expect(second.page.map((row) => row.twitchId)).toEqual(["2"]);
+  expect(
+    (
+      await admin.query(api.admin.streamers, {
+        ...paging,
+        unlinkedOnly: true,
+        search: "Alice",
+      })
+    ).page,
+  ).toEqual([]);
+  expect(
+    (await admin.query(api.admin.streamers, { ...paging, unlinkedOnly: false }))
+      .page,
+  ).toHaveLength(2);
+  await admin.mutation(api.admin.unlink, { twitchId: "1" });
+  expect(
+    (await admin.query(api.admin.streamers, { ...paging, unlinkedOnly: true }))
+      .page,
+  ).toHaveLength(2);
+});

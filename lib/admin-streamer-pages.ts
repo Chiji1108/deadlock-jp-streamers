@@ -8,6 +8,7 @@ type FetchPage = (
 ) => Promise<Page>;
 type State = {
   search: string;
+  unlinkedOnly: boolean;
   results: Page["page"];
   status: "LoadingFirstPage" | "LoadingMore" | "CanLoadMore" | "Exhausted";
   error: string;
@@ -18,6 +19,7 @@ type State = {
 export class AdminStreamerPages {
   private state: State = {
     search: "",
+    unlinkedOnly: false,
     results: [],
     status: "LoadingFirstPage",
     error: "",
@@ -30,7 +32,10 @@ export class AdminStreamerPages {
   constructor(
     private fetchPage: FetchPage,
     private pageSize: number,
-  ) {}
+    unlinkedOnly = false,
+  ) {
+    this.state = { ...this.state, unlinkedOnly };
+  }
 
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -49,11 +54,17 @@ export class AdminStreamerPages {
     this.generation++;
   };
   refresh = () => this.searchFor(this.state.search);
-  searchFor = async (search: string) => {
+  setUnlinkedOnly = (unlinkedOnly: boolean) =>
+    this.searchFor(this.state.search, unlinkedOnly);
+  searchFor = async (
+    search: string,
+    unlinkedOnly = this.state.unlinkedOnly,
+  ) => {
     const generation = ++this.generation;
     this.cursor = null;
     this.publish({
       search,
+      unlinkedOnly,
       results: [],
       status: "LoadingFirstPage",
       error: "",
@@ -71,6 +82,7 @@ export class AdminStreamerPages {
     try {
       const page = await this.fetchPage({
         search: this.state.search,
+        ...(this.state.unlinkedOnly ? { unlinkedOnly: true } : {}),
         paginationOpts: { numItems: this.pageSize, cursor: this.cursor },
       });
       if (generation !== this.generation) return;

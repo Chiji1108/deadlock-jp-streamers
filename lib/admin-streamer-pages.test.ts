@@ -130,3 +130,30 @@ test("initial failure can be retried; unmounted and superseded errors are ignore
   expect(pages.getSnapshot().error).toBe("");
   expect(pages.getSnapshot().results[0].twitchId).toBe("new");
 });
+
+test("unlinked filter defaults on when requested, persists through search/refresh, and resets old pages", async () => {
+  const old = deferred();
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(page([], "next", false))
+    .mockReturnValueOnce(old.promise)
+    .mockResolvedValue(page(["all"]));
+  const pages = new AdminStreamerPages(fetch, 30, true);
+  await pages.refresh();
+  expect(fetch.mock.calls[0][0].unlinkedOnly).toBe(true);
+  expect(pages.getSnapshot().status).toBe("CanLoadMore");
+  const pending = pages.loadMore();
+  await pages.setUnlinkedOnly(false);
+  old.resolve(page(["stale"]));
+  await pending;
+  expect(pages.getSnapshot().results.map((r) => r.twitchId)).toEqual(["all"]);
+  expect(fetch.mock.calls[2][0].paginationOpts.cursor).toBeNull();
+  expect(fetch.mock.calls[2][0].unlinkedOnly).toBeUndefined();
+  await pages.setUnlinkedOnly(true);
+  await pages.searchFor("Alice");
+  await pages.refresh();
+  expect(fetch.mock.lastCall?.[0]).toMatchObject({
+    search: "Alice",
+    unlinkedOnly: true,
+  });
+});

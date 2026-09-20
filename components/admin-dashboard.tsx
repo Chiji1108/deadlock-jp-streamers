@@ -7,6 +7,7 @@ import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
+import { Switch } from "./ui/switch";
 import { AdminHealth } from "./admin-health";
 import { useAdminStreamers } from "./use-admin-streamers";
 import { SteamNameCache } from "@/lib/steam-name-cache";
@@ -96,6 +97,8 @@ function AdminWorkspace() {
   const [notice, setNotice] = useState("");
   const {
     search,
+    unlinkedOnly,
+    setUnlinkedOnly,
     results,
     status,
     error,
@@ -103,7 +106,7 @@ function AdminWorkspace() {
     searchFor,
     refresh,
     loadMore,
-  } = useAdminStreamers(30);
+  } = useAdminStreamers(30, true);
   const getNames = useAction(api.admin.steamPlayerNames);
   const [nameCache] = useState(() => new SteamNameCache());
   const [steamNames, setSteamNames] = useState<Record<number, string>>({});
@@ -176,6 +179,13 @@ function AdminWorkspace() {
           </Field>
         </FieldGroup>
       </form>
+      <label className="flex w-fit items-center gap-2 text-sm">
+        <Switch
+          checked={unlinkedOnly}
+          onCheckedChange={(checked) => void setUnlinkedOnly(checked)}
+        />
+        Steam未登録のみ
+      </label>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {updatedAt === null
@@ -209,6 +219,11 @@ function AdminWorkspace() {
       ) : error && !results.length ? null : (
         <AdminStreamerList
           rows={results}
+          emptyMessage={
+            status === "CanLoadMore"
+              ? "このページに対象の配信者はいません。「さらに表示」で続きを確認できます。"
+              : undefined
+          }
           steamNames={steamNames}
           onSave={async (twitchId, steamAccount) => {
             await link({ twitchId, steamAccount });
@@ -240,10 +255,12 @@ function AdminWorkspace() {
 export function AdminStreamerList({
   rows,
   steamNames = {},
+  emptyMessage,
   onSave,
   onUnlink,
 }: {
   rows: AdminRow[];
+  emptyMessage?: string;
   steamNames?: Record<number, string>;
   onSave: (twitchId: string, steamAccount: string) => Promise<void>;
   onUnlink: (twitchId: string) => Promise<void>;
@@ -251,7 +268,7 @@ export function AdminStreamerList({
   if (!rows.length)
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
-        配信者が見つかりません。
+        {emptyMessage ?? "配信者が見つかりません。"}
       </p>
     );
   return (

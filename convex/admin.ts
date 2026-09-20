@@ -45,7 +45,11 @@ export const access = query({
   handler: adminIdentity,
 });
 export const streamers = query({
-  args: { search: v.string(), paginationOpts: paginationOptsValidator },
+  args: {
+    search: v.string(),
+    unlinkedOnly: v.optional(v.boolean()),
+    paginationOpts: paginationOptsValidator,
+  },
   returns: paginationResultValidator(
     v.object({
       twitchId: v.string(),
@@ -83,39 +87,43 @@ export const streamers = query({
           .paginate(args.paginationOpts);
     return {
       ...result,
-      page: await Promise.all(
-        result.page.map(async (row) => {
-          const [profile, state] = await Promise.all([
-            "displayName" in row
-              ? row
-              : ctx.db
-                  .query("streamers")
-                  .withIndex("by_twitchId", (q) =>
-                    q.eq("twitchId", row.twitchId),
-                  )
-                  .unique(),
-            "isLive" in row
-              ? row
-              : ctx.db
-                  .query("streamerState")
-                  .withIndex("by_twitchId", (q) =>
-                    q.eq("twitchId", row.twitchId),
-                  )
-                  .unique(),
-          ]);
-          return {
-            twitchId: row.twitchId,
-            login: profile?.login ?? row.twitchId,
-            displayName: profile?.displayName ?? row.twitchId,
-            profileImageUrl: profile?.profileImageUrl ?? null,
-            deadlockRank: await rankForStreamer(ctx, row.twitchId),
-            isLive: state?.isLive ?? false,
-            lastSeenAt: state?.lastSeenAt ?? null,
-            liveStartedAt: state?.liveStartedAt ?? null,
-            liveViewerCount: state?.liveViewerCount ?? null,
-          };
-        }),
-      ),
+      page: (
+        await Promise.all(
+          result.page.map(async (row) => {
+            const rank = await rankForStreamer(ctx, row.twitchId);
+            if (args.unlinkedOnly && rank !== null) return null;
+            const [profile, state] = await Promise.all([
+              "displayName" in row
+                ? row
+                : ctx.db
+                    .query("streamers")
+                    .withIndex("by_twitchId", (q) =>
+                      q.eq("twitchId", row.twitchId),
+                    )
+                    .unique(),
+              "isLive" in row
+                ? row
+                : ctx.db
+                    .query("streamerState")
+                    .withIndex("by_twitchId", (q) =>
+                      q.eq("twitchId", row.twitchId),
+                    )
+                    .unique(),
+            ]);
+            return {
+              twitchId: row.twitchId,
+              login: profile?.login ?? row.twitchId,
+              displayName: profile?.displayName ?? row.twitchId,
+              profileImageUrl: profile?.profileImageUrl ?? null,
+              deadlockRank: rank,
+              isLive: state?.isLive ?? false,
+              lastSeenAt: state?.lastSeenAt ?? null,
+              liveStartedAt: state?.liveStartedAt ?? null,
+              liveViewerCount: state?.liveViewerCount ?? null,
+            };
+          }),
+        )
+      ).filter((row) => row !== null),
     };
   },
 });
