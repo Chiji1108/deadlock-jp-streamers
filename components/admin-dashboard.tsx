@@ -2,18 +2,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SignIn, UserButton, useAuth } from "@clerk/nextjs";
-import {
-  useAction,
-  useConvexAuth,
-  useMutation,
-  usePaginatedQuery,
-  useQuery,
-} from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { Avatar, LoadingPanel, LiveBadge, useFreshness } from "./dashboard-ui";
 import { AdminHealth } from "./admin-health";
+import { useAdminStreamers } from "./use-admin-streamers";
 import { SteamNameCache } from "@/lib/steam-name-cache";
 import { AdminSteamSearch } from "./admin-steam-search";
 import { AdminMatchRegistration } from "./admin-match-registration";
@@ -98,13 +93,17 @@ export function AdminDashboard() {
 }
 function AdminWorkspace() {
   const [input, setInput] = useState("");
-  const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.admin.streamers,
-    { search },
-    { initialNumItems: 30 },
-  );
+  const {
+    search,
+    results,
+    status,
+    error,
+    updatedAt,
+    searchFor,
+    refresh,
+    loadMore,
+  } = useAdminStreamers(30);
   const getNames = useAction(api.admin.steamPlayerNames);
   const [nameCache] = useState(() => new SteamNameCache());
   const [steamNames, setSteamNames] = useState<Record<number, string>>({});
@@ -138,12 +137,12 @@ function AdminWorkspace() {
   return (
     <>
       <AdminHealth />
-      <AdminSteamSearch />
-      <AdminMatchRegistration />
+      <AdminSteamSearch onLinked={() => void refresh()} />
+      <AdminMatchRegistration onLinked={() => void refresh()} />
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          setSearch(input.trim());
+          void searchFor(input.trim());
         }}
       >
         <FieldGroup>
@@ -168,7 +167,7 @@ function AdminWorkspace() {
                 variant="ghost"
                 onClick={() => {
                   setInput("");
-                  setSearch("");
+                  void searchFor("");
                 }}
               >
                 クリア
@@ -177,24 +176,51 @@ function AdminWorkspace() {
           </Field>
         </FieldGroup>
       </form>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {updatedAt === null
+            ? ""
+            : `${new Intl.DateTimeFormat("ja-JP", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Tokyo",
+              }).format(updatedAt)} 時点`}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={status === "LoadingFirstPage" || status === "LoadingMore"}
+          onClick={() => void refresh()}
+        >
+          更新
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <p role="status" className="text-sm text-muted-foreground">
         {notice}
       </p>
       {status === "LoadingFirstPage" ? (
         <LoadingPanel />
-      ) : (
+      ) : error && !results.length ? null : (
         <AdminStreamerList
           rows={results}
           steamNames={steamNames}
           onSave={async (twitchId, steamAccount) => {
             await link({ twitchId, steamAccount });
             setNotice(
-              "Steamアカウントを保存しました。ランクを取得しています。",
+              "Steamアカウントを保存しました。ランク取得後は「更新」で確認できます。",
             );
+            await refresh();
           }}
           onUnlink={async (twitchId) => {
             await unlink({ twitchId });
             setNotice("紐付けを解除しました。");
+            await refresh();
           }}
         />
       )}
@@ -203,7 +229,7 @@ function AdminWorkspace() {
           className="self-center"
           variant="outline"
           disabled={status !== "CanLoadMore"}
-          onClick={() => loadMore(30)}
+          onClick={() => void loadMore()}
         >
           {status === "LoadingMore" ? "読み込み中…" : "さらに表示"}
         </Button>

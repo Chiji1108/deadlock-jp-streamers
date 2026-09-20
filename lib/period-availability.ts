@@ -4,6 +4,18 @@ import type { Period } from "../convex/model";
 // Site-wide measurement start, independent of each streamer's first appearance.
 export const MEASUREMENT_STARTED_AT = Date.parse("2026-09-19T00:00:00+09:00");
 export const MEASUREMENT_START_LABEL = "2026/9/19 計測開始";
+export function heatmapDays(observedAt: number | null | undefined): number {
+  // Count JST calendar days inclusively, with September 19 as day one.
+  return Math.min(
+    90,
+    Math.max(
+      1,
+      Math.floor(
+        ((observedAt ?? MEASUREMENT_STARTED_AT) - MEASUREMENT_STARTED_AT) / DAY,
+      ) + 1,
+    ),
+  );
+}
 export function availablePeriods(
   observedAt: number | null | undefined,
 ): Period[] {

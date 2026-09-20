@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useAction, useMutation, usePaginatedQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
+import { useAdminStreamers } from "./use-admin-streamers";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { api } from "@/convex/_generated/api";
@@ -27,7 +28,11 @@ export function errorMessage(error: unknown) {
 export function profileUrl(accountId: number) {
   return `https://steamcommunity.com/profiles/${BigInt(accountId) + BigInt("76561197960265728")}`;
 }
-export function AdminMatchRegistration() {
+export function AdminMatchRegistration({
+  onLinked,
+}: {
+  onLinked?: () => void;
+}) {
   const lookup = useAction(api.admin.matchParticipants);
   const [input, setInput] = useState("");
   const [match, setMatch] = useState<Match | null>(null);
@@ -148,6 +153,7 @@ export function AdminMatchRegistration() {
               `${name}に ${player.name}（${player.heroName}）を登録しました。`,
             );
             setPlayer(null);
+            onLinked?.();
           }}
         />
       )}
@@ -164,15 +170,17 @@ export function StreamerPicker({
   onSaved: (name: string) => void;
 }) {
   const [input, setInput] = useState("");
-  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Streamer | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.admin.streamers,
-    { search },
-    { initialNumItems: 20 },
-  );
+  const {
+    results,
+    status,
+    error: loadError,
+    searchFor,
+    refresh,
+    loadMore,
+  } = useAdminStreamers(20);
   const link = useMutation(api.admin.link);
   const replacing =
     selected?.deadlockRank &&
@@ -207,7 +215,7 @@ export function StreamerPicker({
           className="flex gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            setSearch(input.trim());
+            void searchFor(input.trim());
             setSelected(null);
             setError("");
           }}
@@ -263,6 +271,7 @@ export function StreamerPicker({
               読み込み中…
             </p>
           ) : (
+            !loadError &&
             !results.length && (
               <p className="p-4 text-sm text-muted-foreground">
                 配信者が見つかりません。
@@ -274,12 +283,30 @@ export function StreamerPicker({
               variant="ghost"
               className="w-full"
               disabled={pending || status === "LoadingMore"}
-              onClick={() => loadMore(20)}
+              onClick={() => void loadMore()}
             >
               {status === "LoadingMore" ? "読み込み中…" : "さらに表示"}
             </Button>
           )}
         </div>
+        {loadError && (
+          <div className="space-y-2">
+            <p role="alert" className="text-sm text-destructive">
+              {loadError}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={() => {
+                setSelected(null);
+                void refresh();
+              }}
+            >
+              再試行
+            </Button>
+          </div>
+        )}
         {selected && (
           <p className="text-sm">
             {selected.displayName} に {player.name} を紐付けます。

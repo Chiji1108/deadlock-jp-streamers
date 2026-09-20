@@ -10,14 +10,17 @@ import {
 } from "@/components/ui/tooltip";
 import { heatmapCellClass, heatmapLevels } from "./heatmap-styles";
 import { number } from "./dashboard-ui";
+import { heatmapDays } from "@/lib/period-availability";
 import type { StreamerData } from "./streamer-detail";
 
 const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
 
 export function StreamingHoursHeatmap({
   cells,
+  observedAt,
 }: {
   cells: StreamerData["heatmap"];
+  observedAt: number | null;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = cells.find(
@@ -35,7 +38,7 @@ export function StreamingHoursHeatmap({
           配信している時間帯
         </h2>
         <span className="text-xs text-muted-foreground">
-          直近90日間
+          直近{heatmapDays(observedAt)}日間
         </span>
       </div>
       <Card className="min-w-0">

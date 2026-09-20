@@ -166,7 +166,10 @@ export function StreamerDetailView({
         </div>
       </section>
       <div className="w-full min-w-0">
-        <StreamingHoursHeatmap cells={data.heatmap} />
+        <StreamingHoursHeatmap
+          cells={data.heatmap}
+          observedAt={data.lastCollectedAt}
+        />
       </div>
       <section
         className="flex min-w-0 flex-col gap-3"

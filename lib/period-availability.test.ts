@@ -1,10 +1,22 @@
 import { expect, test } from "vitest";
 import {
   availablePeriods,
+  heatmapDays,
   resolvePeriod,
   MEASUREMENT_STARTED_AT,
 } from "./period-availability";
 const DAY = 86_400_000;
+test.each([
+  [-DAY, 1],
+  [0, 1],
+  [DAY - 1, 1],
+  [DAY, 2],
+  [88 * DAY, 89],
+  [89 * DAY, 90],
+  [120 * DAY, 90],
+])("heatmap day count after %s milliseconds", (elapsed, expected) => {
+  expect(heatmapDays(MEASUREMENT_STARTED_AT + elapsed)).toBe(expected);
+});
 test.each([
   [0, ["all"]],
   [7 * DAY - 1, ["all"]],

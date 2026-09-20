@@ -13,7 +13,7 @@ import {
 } from "./admin-match-registration";
 
 type Profile = FunctionReturnType<typeof api.admin.searchSteam>[number];
-export function AdminSteamSearch() {
+export function AdminSteamSearch({ onLinked }: { onLinked?: () => void }) {
   const search = useAction(api.admin.searchSteam);
   const [input, setInput] = useState("");
   const [results, setResults] = useState<Profile[] | null>(null);
@@ -138,6 +138,7 @@ export function AdminSteamSearch() {
           onSaved={(name) => {
             setNotice(`${name}に ${selected.name} を登録しました。`);
             setSelected(null);
+            onLinked?.();
           }}
         />
       )}
